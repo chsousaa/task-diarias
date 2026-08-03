@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TASK DIÁRIAS · Planejamento Semanal</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg-2: #161923;
+      --bg-3: #1e222e;
+      --panel: #191d28;
+      --line: #2a2f3d;
+      --text: #e6e9ef;
+      --muted: #8a91a3;
+      --accent: #6c8cff;
+      --accent-2: #4b6bff;
+      --red: #ff5c6a;
+      --green: #35c98a;
+      --blue: #47a6ff;
+      --yellow: #ffcf5c;
+      --radius: 10px;
+      --shadow: 0 6px 24px rgba(0,0,0,.35);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    .hidden { display: none !important; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ===== Topbar ===== */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 22px;
+      background: linear-gradient(180deg, var(--bg-2), var(--bg));
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .logo {
+      font-size: 22px; color: var(--accent);
+      background: var(--bg-3); width: 40px; height: 40px;
+      display: grid; place-items: center; border-radius: 10px;
+      border: 1px solid var(--line);
+    }
+    .brand h1 { font-size: 17px; margin: 0; letter-spacing: .5px; }
+    .brand .sub { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .weeknav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .week-label { text-align: center; min-width: 150px; }
+    .week-label strong { display: block; font-size: 15px; }
+    .week-label span { color: var(--muted); font-size: 12px; }
+
+    .actions { display: flex; gap: 8px; }
+
+    /* ===== Buttons ===== */
+    .btn {
+      background: var(--bg-3); color: var(--text);
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; cursor: pointer;
+      transition: .15s; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); background: #232838; }
+    .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; font-weight: 600; }
+    .btn.primary:hover { background: var(--accent); }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 5px 10px; font-size: 12px; }
+    .btn.locked { border-color: var(--yellow); color: var(--yellow); background: rgba(255,207,92,.1); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn:disabled:hover { border-color: var(--line); background: var(--bg-3); }
+    .btn.danger { color: var(--red); border-color: transparent; }
+    .btn.danger:hover { border-color: var(--red); background: rgba(255,92,106,.08); }
+    .icon-btn {
+      background: var(--bg-3); color: var(--text); border: 1px solid var(--line);
+      width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px;
+      display: grid; place-items: center; transition: .15s;
+    }
+    .icon-btn:hover { border-color: var(--accent); }
+
+    /* ===== Meta bar (quantidades na tela principal) ===== */
+    .meta-bar {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      padding: 12px 22px; background: var(--bg-2);
+      border-bottom: 1px solid var(--line); position: sticky; top: 69px; z-index: 20;
+    }
+    .meta-hint { color: var(--muted); font-size: 12px; width: 100%; }
+    .meta-chip {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 999px; padding: 6px 10px 6px 8px;
+    }
+    .meta-chip .oc {
+      width: 26px; height: 26px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #0d0f14;
+      flex: none;
+    }
+    .meta-chip .info { line-height: 1.15; }
+    .meta-chip .info b { font-size: 13px; }
+    .meta-chip .info small { display: block; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .meta-chip input.qty {
+      width: 56px; text-align: center; font-weight: 700; font-size: 14px;
+      background: var(--bg-3); color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 4px;
+    }
+    .meta-chip input.qty:focus { outline: none; border-color: var(--accent); }
+    .meta-chip.done { border-color: rgba(53,201,138,.5); }
+    .meta-chip.over { border-color: var(--red); }
+    .meta-chip.total { border-style: dashed; }
+    .meta-chip.total.ok { border-color: var(--green); }
+    .meta-chip.total.bad { border-color: var(--yellow); }
+    .meta-empty { color: var(--muted); padding: 6px; }
+
+    /* ===== Boards ===== */
+    .boards { padding: 18px 22px 8px; display: flex; flex-direction: column; gap: 22px; }
+    .board { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .board-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .board-head h2 { margin: 0; font-size: 14px; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
+    .board-meta { color: var(--muted); font-size: 12px; }
+
+    .tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; letter-spacing: .3px; }
+    .tag.red { background: rgba(255,92,106,.15); color: var(--red); }
+    .tag.green { background: rgba(53,201,138,.15); color: var(--green); }
+    .tag.blue { background: rgba(71,166,255,.15); color: var(--blue); }
+
+    /* grade */
+    .grid { display: grid; overflow-x: auto; }
+    .grid .cell, .grid .head, .grid .rowhead {
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      min-height: 62px; padding: 6px;
+    }
+    .grid .head {
+      background: var(--bg-3); font-weight: 600; font-size: 12px; text-align: center;
+      min-height: unset; padding: 8px 6px; position: sticky; top: 0;
+      display: flex; flex-direction: column; gap: 2px; align-items: center;
+    }
+    .grid .head small { color: var(--muted); font-weight: 400; font-size: 10px; }
+    .grid .head.weekend { color: var(--muted); background: #12151d; }
+    .grid .head.today { background: rgba(108,140,255,.22); color: #fff; }
+    .grid .head.today .today-tag { display: block; font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: .5px; text-transform: uppercase; }
+    .grid .cell.today { background: rgba(108,140,255,.06); box-shadow: inset 1px 0 0 var(--accent), inset -1px 0 0 var(--accent); }
+    .grid .head.deadline-red { box-shadow: inset 0 -3px 0 var(--red); }
+    .grid .head.deadline-green { box-shadow: inset 0 -3px 0 var(--green); }
+    .grid .head.deadline-blue { box-shadow: inset 0 -3px 0 var(--blue); }
+    .grid .corner { background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .grid .rowhead {
+      background: var(--panel); font-weight: 600; font-size: 12px;
+      display: flex; align-items: center; gap: 6px; min-height: 62px;
+      position: sticky; left: 0; z-index: 2;
+    }
+    .grid .rowhead .role { font-size: 10px; color: var(--muted); font-weight: 400; }
+    .pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+    .grid .rowhead.backup::after { content: "tapa-buraco"; font-size: 9px; color: var(--yellow); }
+    .grid .cell { display: flex; flex-direction: column; gap: 4px; }
+    .grid .cell.weekend { background: #12151d; }
+    .grid .cell.dragover { background: rgba(108,140,255,.12); outline: 1px dashed var(--accent); outline-offset: -3px; }
+
+    /* cards */
+    .card {
+      border-radius: 7px; padding: 5px 8px; font-size: 12px; cursor: grab;
+      border: 1px solid rgba(255,255,255,.08); color: #0d0f14; font-weight: 600;
+      display: flex; align-items: center; gap: 5px; user-select: none;
+      position: relative;
+    }
+    .card:active { cursor: grabbing; }
+    .card .cid { font-weight: 700; }
+    .card .cbadges { margin-left: auto; display: flex; gap: 3px; }
+    .card .b { font-size: 9px; background: rgba(0,0,0,.28); color: #fff; border-radius: 4px; padding: 0 4px; font-weight: 700; }
+    .card.dragging { opacity: .4; }
+    .card.off { filter: grayscale(.3); }
+
+    /* ===== Legend ===== */
+    .legend {
+      display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+      padding: 10px 22px 26px; color: var(--muted); font-size: 12px;
+    }
+    .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+    .dot.red { background: var(--red); } .dot.green { background: var(--green); } .dot.blue { background: var(--blue); }
+    .badge-mini {
+      display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px;
+      font-size: 10px; font-weight: 700; margin-right: 5px; vertical-align: middle; color: #0d0f14;
+    }
+    .badge-mini.dupla { background: var(--accent); color:#fff; }
+    .badge-mini.gordura { background: var(--yellow); }
+    .legend .hint { margin-left: auto; font-style: italic; }
+
+    /* ===== Modal ===== */
+    .modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      display: grid; place-items: center; z-index: 100; padding: 20px;
+    }
+    .modal.hidden { display: none; }
+    .modal-box {
+      background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
+      width: min(880px, 100%); max-height: 90vh; display: flex; flex-direction: column;
+      box-shadow: var(--shadow);
+    }
+    .modal-head, .modal-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--line);
+    }
+    .modal-foot { border-bottom: none; border-top: 1px solid var(--line); }
+    .modal-head h2 { margin: 0; font-size: 16px; }
+    .modal-body { padding: 18px; overflow-y: auto; }
+    .modal-body hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+    .modal-body h3 { font-size: 13px; margin: 0 0 10px; color: var(--text); letter-spacing: .3px; }
+
+    .config-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .mini-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .mini-row {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+    }
+    .mini-row input[type=text] { flex: 1; min-width: 0; }
+    .mini-row .swatch { width: 20px; height: 20px; border-radius: 5px; border: none; padding: 0; cursor: pointer; }
+    .mini-row .del { color: var(--red); cursor: pointer; background: none; border: none; font-size: 15px; }
+    .mini-row label.tgl { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+
+    input, select {
+      background: var(--bg-3); color: var(--text); border: 1px solid var(--line);
+      border-radius: 7px; padding: 7px 9px; font-size: 13px; font-family: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .field { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+    .field input { max-width: 260px; }
+    .muted { color: var(--muted); }
+    .muted code { background: var(--bg-3); padding: 1px 5px; border-radius: 4px; color: var(--accent); }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+      background: var(--bg-3); border: 1px solid var(--line); color: var(--text);
+      padding: 11px 18px; border-radius: 10px; box-shadow: var(--shadow); z-index: 200; font-size: 13px;
+    }
+    .toast.hidden { display: none; }
+    .toast.ok { border-color: var(--green); }
+    .toast.warn { border-color: var(--yellow); }
+    .toast.err { border-color: var(--red); }
+
+    /* ===== View tabs ===== */
+    .viewtabs { display: flex; gap: 4px; background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+    .viewtabs .vt {
+      background: transparent; color: var(--muted); border: none; cursor: pointer;
+      padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: .15s;
+    }
+    .viewtabs .vt:hover { color: var(--text); }
+    .viewtabs .vt.active { background: var(--accent-2); color: #fff; }
+
+    /* ===== Traffic view ===== */
+    .traffic { padding: 18px 22px 8px; }
+    .traffic.hidden { display: none; }
+    .traffic-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 16px 20px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .traffic-top h2 { margin: 0; font-size: 18px; }
+    .traffic-top h2 span { color: var(--blue); }
+    .traffic-total {
+      text-align: center; background: var(--bg-3); border: 1px solid var(--blue);
+      border-radius: 12px; padding: 8px 18px;
+    }
+    .traffic-total b { font-size: 26px; display: block; color: var(--blue); }
+    .traffic-total small { color: var(--muted); font-size: 11px; }
+    .traffic-offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .toff { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .toff-head {
+      display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+      border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .toff-head .oc { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #0d0f14; }
+    .toff-head b { font-size: 14px; }
+    .toff-head .cnt { margin-left: auto; font-size: 20px; font-weight: 800; }
+    .toff-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .trow {
+      display: flex; align-items: center; gap: 8px; padding: 7px 9px;
+      background: var(--bg-3); border-radius: 8px; border-left: 5px solid var(--line); font-size: 12px;
+    }
+    .trow .tname { font-weight: 700; }
+    .trow .tmeta { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
+    .trow .who { display: inline-flex; align-items: center; gap: 4px; }
+    .trow .who i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .trow .gb { background: var(--yellow); color: #0d0f14; font-weight: 700; border-radius: 4px; padding: 0 5px; font-size: 10px; }
+    .traffic-empty { color: var(--muted); padding: 30px; text-align: center; }
+    .gordura-box {
+      margin-top: 16px; background: var(--bg-2); border: 1px dashed var(--yellow);
+      border-radius: var(--radius); padding: 14px 16px;
+    }
+    .gordura-box h3 { margin: 0 0 4px; font-size: 13px; color: var(--yellow); }
+    .gordura-box .sub { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+    .gordura-box .grow { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-3); border-radius: 8px; padding: 5px 9px; font-size: 12px; margin: 0 6px 6px 0; border-left: 5px solid var(--yellow); }
+
+    @media (max-width: 720px) {
+      .config-cols { grid-template-columns: 1fr; }
+      .weeknav { order: 3; margin: 0; }
+      .actions { order: 2; }
+      .viewtabs { order: 4; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▣</span>
+      <div>
+        <h1>TASK DIÁRIAS</h1>
+        <p class="sub">Planejamento semanal de criativos</p>
+      </div>
+    </div>
+
+    <div class="viewtabs" id="viewTabs">
+      <button class="vt active" data-view="plan">🗂 Planejamento</button>
+      <button class="vt" data-view="traffic">🚀 Tráfego</button>
+    </div>
+
+    <div class="weeknav">
+      <button id="prevWeek" class="icon-btn" title="Semana anterior">‹</button>
+      <div class="week-label">
+        <strong id="weekTitle">Semana 1</strong>
+        <span id="weekDates">—</span>
+      </div>
+      <button id="nextWeek" class="icon-btn" title="Próxima semana">›</button>
+    </div>
+
+    <div class="actions">
+      <button id="lockWeek" class="btn" title="Travar: marca como semana REAL e impede regerar por cima">🔓 Travar</button>
+      <button id="generateBtn" class="btn primary">⚡ Gerar semana</button>
+      <button id="exportBtn" class="btn">📋 Exportar print</button>
+      <button id="configBtn" class="btn ghost">⚙ Config</button>
+    </div>
+  </header>
+
+  <!-- Quantidades por oferta + contadores -->
+  <section id="metaBar" class="meta-bar"></section>
+
+  <main id="boards" class="boards">
+    <!-- COPY -->
+    <section class="board" data-board="copy">
+      <div class="board-head">
+        <h2>COPY <span class="tag red">prazo vermelho</span></h2>
+        <div class="board-meta"><span id="copyCount">0</span> levas</div>
+      </div>
+      <div id="copyGrid" class="grid"></div>
+    </section>
+
+    <!-- EDIÇÃO -->
+    <section class="board" data-board="edit">
+      <div class="board-head">
+        <h2>EDIÇÃO <span class="tag green">prazo verde</span> <span class="tag blue">tráfego azul</span></h2>
+        <div class="board-meta"><span id="editCount">0</span> levas</div>
+      </div>
+      <div id="editGrid" class="grid"></div>
+    </section>
+  </main>
+
+  <!-- ===== Aba TRÁFEGO ===== -->
+  <section id="trafficView" class="traffic hidden">
+    <div class="traffic-top">
+      <div>
+        <h2>Sobe no sábado <span id="satDate">—</span></h2>
+        <p class="muted" id="satSub">A leva inteira da semana sobe de uma vez no sábado.</p>
+      </div>
+      <div class="traffic-total" id="trafficTotal"></div>
+    </div>
+    <div id="trafficOffers" class="traffic-offers"></div>
+    <div id="trafficGordura"></div>
+  </section>
+
+  <footer class="legend">
+    <span><i class="dot red"></i> Prazo Copy</span>
+    <span><i class="dot green"></i> Prazo Edição</span>
+    <span><i class="dot blue"></i> Prazo Tráfego</span>
+    <span>Edição · sufixo <b>2</b> = leva secundária (dupla) — dia sim, dia não por editor</span>
+    <span><i class="badge-mini gordura">G</i> Gordura (próx. semana)</span>
+    <span id="copyLegend" style="display:flex;gap:14px;align-items:center"></span>
+    <span class="hint">Arraste os cards entre as células para ajustar.</span>
+  </footer>
+
+  <!-- ===== Modal de configuração ===== -->
+  <div id="configModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>Configuração</h2>
+        <button id="closeConfig" class="icon-btn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="config-cols">
+          <div class="config-col">
+            <h3>Ofertas</h3>
+            <div id="offersList" class="mini-list"></div>
+            <button id="addOffer" class="btn small">+ Oferta</button>
+          </div>
+
+          <div class="config-col">
+            <h3>Time COPY</h3>
+            <div id="copyTeamList" class="mini-list"></div>
+            <button id="addCopy" class="btn small">+ Copy</button>
+            <label class="field">
+              Levas por copy / semana
+              <input id="levasPerCopy" type="number" min="1" max="10" />
+            </label>
+          </div>
+
+          <div class="config-col">
+            <h3>Time EDIÇÃO</h3>
+            <div id="editTeamList" class="mini-list"></div>
+            <button id="addEditor" class="btn small">+ Editor</button>
+          </div>
+        </div>
+
+        <hr />
+        <label class="field">
+          Nomenclatura dos cards
+          <input id="nomenclature" type="text" placeholder="AD_{COPY}-{OFERTA}{ini}-{fim}" />
+          <small class="muted">Use <code>{COPY}</code> (sigla), <code>{OFERTA}</code>, <code>{ini}</code>–<code>{fim}</code> (range de ads). No board de edição o editor+leva entram sozinhos (ex.: <code>-WA2</code>).</small>
+        </label>
+
+        <hr />
+        <h3>Numeração dos ads</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:12px">
+          Cada leva é um range de ads, contado por copy + oferta. Abaixo, o <b>último nº já usado</b>
+          de cada um (a próxima leva começa em +1). Ajuste se a realidade do ClickUp mudar.
+        </p>
+        <label class="field" style="margin-top:0">
+          Ads por leva
+          <input id="adsPorLeva" type="number" min="1" max="20" style="max-width:80px" />
+        </label>
+        <div id="adBaseGrid" style="margin-top:10px"></div>
+
+        <hr />
+        <label class="field">
+          Quinta-feira da SEMANA 1 (cada semana seguinte anda +7 dias)
+          <input id="weekStart" type="date" />
+        </label>
+
+        <hr />
+        <h3>Backup dos dados</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:12px">
+          Seus dados ficam salvos no navegador. Baixe um backup pra não perder nada se limpar o
+          navegador, trocar de computador ou abrir o app de outro lugar.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="exportData" class="btn small">⬇ Baixar backup</button>
+          <label class="btn small" style="cursor:pointer;display:inline-block">
+            ⬆ Restaurar backup
+            <input id="importData" type="file" accept="application/json,.json" style="display:none" />
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button id="resetData" class="btn ghost danger">Resetar tudo</button>
+        <button id="saveConfig" class="btn primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    /* ============================================================
+       TASK DIÁRIAS — planejamento semanal de criativos
+       Arquivo ÚNICO e auto-contido: abre com duplo-clique.
+       Fluxo: defina a QUANTIDADE de cada oferta na barra de cima
+       → ⚡ Gerar semana divide entre copys e editores
+       → contadores garantem que nenhuma oferta fique sem ad.
+       ============================================================ */
+
+    const STORE_KEY = "task_diarias_v1";
+
+    /* ---------- Calendário das grades ----------
+       COPY: semana começa QUI (defasagem). SÁB/DOM folga.
+       EDIÇÃO: semana começa SEX (1 dia atrás do copy). SÁB/DOM folga.
+    */
+    const COPY_COLS = [
+      { key: "qui", label: "QUI", off: 0 },
+      { key: "sex", label: "SEX", off: 1 },
+      { key: "sab", label: "SÁB", off: 2, weekend: true },
+      { key: "dom", label: "DOM", off: 3, weekend: true },
+      { key: "seg", label: "SEG", off: 4 },
+      { key: "ter", label: "TER", off: 5 },
+      { key: "qua", label: "QUA", off: 6 },
+    ];
+    const EDIT_COLS = [
+      { key: "sex", label: "SEX", off: 1 },
+      { key: "sab", label: "SÁB", off: 2, weekend: true },
+      { key: "dom", label: "DOM", off: 3, weekend: true },
+      { key: "seg", label: "SEG", off: 4 },
+      { key: "ter", label: "TER", off: 5 },
+      { key: "qua", label: "QUA", off: 6 },
+      { key: "qui", label: "QUI", off: 7 },
+    ];
+    const COPY_WORK = COPY_COLS.filter((c) => !c.weekend);
+    const EDIT_WORK = EDIT_COLS.filter((c) => !c.weekend);
+
+    const DEADLINES = {
+      copy: { qua: "deadline-red" },
+      edit: { qui: "deadline-green", sex: "deadline-blue" },
+    };
+
+    /* Último nº de ad já feito por copy/oferta (base pra continuar a contagem).
+       Confirmado pelo Carlos em 27/07/2026 — editável no Config. */
+    const DEFAULT_AD_BASE = {
+      Carlos: { PACU: 104, OTIT: 110 },
+      Raquel: { PACU: 106, OTIT: 109 },
+      Clara: { PACU: 115, OTIT: 99 },
+    };
+
+    /* ---------- Estado default ---------- */
+    function defaultState() {
+      return {
+        config: {
+          offers: [
+            { code: "PACU", color: "#35c98a", active: true },
+            { code: "OTIT", color: "#ffab5c", active: true },
+            { code: "TRCA", color: "#ff5c6a", active: false },
+            { code: "OREG", color: "#47a6ff", active: false },
+            { code: "CAIN", color: "#b98cff", active: false },
+          ],
+          copyTeam: [
+            { name: "Carlos", sigla: "CA", color: "#4d9bff", active: true },
+            { name: "Raquel", sigla: "RA", color: "#b96bff", active: true },
+            { name: "Clara", sigla: "CL", color: "#ff6bb3", active: true },
+          ],
+          editTeam: [
+            { name: "Walison", sigla: "WA", active: true, backup: false },
+            { name: "Mariana", sigla: "MA", active: true, backup: false },
+            { name: "Leticia", sigla: "LE", active: false, backup: false },
+            { name: "Gabriel", sigla: "GA", active: false, backup: false },
+            { name: "Leandro", sigla: "LD", active: true, backup: true },
+          ],
+          levasPerCopy: 5,
+          adsPorLeva: 5,
+          nomenclature: "AD_{COPY}-{OFERTA}{ini}-{fim}",
+          // último nº de ad já usado por copy/oferta (base pra continuar a contagem)
+          adBase: JSON.parse(JSON.stringify(DEFAULT_AD_BASE)),
+          weekStart: nextThursdayISO(),
+        },
+        weeks: {},
+        current: 1,
+      };
+    }
+
+    /* ---------- Helpers ---------- */
+    // Âncora da semana = quinta-feira da SEMANA ATUAL (a quinta mais recente
+    // <= hoje). A semana do copy vai QUI→QUA, então qualquer dia útil cai nela.
+    function nextThursdayISO() {
+      const d = new Date();
+      const day = d.getDay(); // 0=dom … 4=qui … 6=sáb
+      const back = (day - 4 + 7) % 7; // dias desde a última quinta
+      d.setDate(d.getDate() - back);
+      return d.toISOString().slice(0, 10);
+    }
+    function addDaysISO(iso, n) {
+      const d = new Date(iso + "T00:00:00");
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+    function fmtBR(iso) {
+      const [y, m, d] = iso.split("-");
+      return `${d}/${m}`;
+    }
+    function todayISO() {
+      return new Date().toISOString().slice(0, 10);
+    }
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+    function activeOffers(cfg) { return cfg.offers.filter((o) => o.active); }
+    function offerColor(cfg, code) {
+      const o = cfg.offers.find((x) => x.code === code);
+      return o ? o.color : "#8a91a3";
+    }
+
+    /* ---------- Persistência ---------- */
+    let STATE = load();
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          migrate(s);
+          return s;
+        }
+      } catch (e) {}
+      const s = defaultState();
+      ensureWeek(s, 1);
+      seedDocGordura(s);
+      return s;
+    }
+    // dados salvos de versões anteriores: garante sigla dos copys e {COPY} no nome
+    function siglaFromName(name, taken) {
+      const up = (name || "??").toUpperCase().replace(/[^A-ZÀ-Ü]/g, "");
+      let s = up.slice(0, 2) || "??";
+      let i = 2;
+      while (taken.includes(s) && i < up.length) { s = up[0] + up[i]; i++; }
+      return s;
+    }
+    function migrate(s) {
+      const taken = [];
+      const copyPalette = ["#4d9bff", "#b96bff", "#ff6bb3", "#5cffd6", "#ffd166", "#8aff5c"];
+      (s.config.copyTeam || []).forEach((p, i) => {
+        if (!p.sigla) p.sigla = siglaFromName(p.name, taken);
+        if (!p.color) p.color = copyPalette[i % copyPalette.length];
+        taken.push(p.sigla);
+      });
+      // siglas dos editores (WA/MA/LD…) usadas no nome do ad
+      const takenEd = [];
+      (s.config.editTeam || []).forEach((p) => {
+        if (!p.sigla) p.sigla = siglaFromName(p.name, takenEd);
+        takenEd.push(p.sigla);
+      });
+      // numeração de ads: base + qtd por leva
+      if (s.config.adsPorLeva == null) s.config.adsPorLeva = 5;
+      if (!s.config.adBase || Object.keys(s.config.adBase).length === 0)
+        s.config.adBase = JSON.parse(JSON.stringify(DEFAULT_AD_BASE));
+      // nomenclatura: migra formato antigo pro real (AD_CA-PACU80-84)
+      if (!s.config.nomenclature || !s.config.nomenclature.includes("{ini}"))
+        s.config.nomenclature = "AD_{COPY}-{OFERTA}{ini}-{fim}";
+      // semana 0 de versão antiga (sem autor nos cards): recria com autoria
+      if (s.weeks && s.weeks[0] && !(s.weeks[0].copy?.Carlos?.qui?.by)) delete s.weeks[0];
+      seedDocGordura(s);
+    }
+    /* Transição do Google Doc → app:
+       a "Semana 0" é a SEMANA 06 do doc (copy 09–15/07, edição 10–16/07),
+       replicada fielmente para o dia 16/07 dos editores existir no app
+       e a gordura (OTIT PS da Clara) entrar na contagem da Semana 1. */
+    function seedDocGordura(s) {
+      const has0 = s.weeks[0] && Object.keys(s.weeks[0].copy || {}).length > 0;
+      if (has0) return;
+      const C = (offer, by, extra = {}) => ({ uid: uid(), id: offer, offer, by, gordura: false, ...extra });
+      s.weeks[0] = {
+        num: 0,
+        meta: { PACU: 6, OTIT: 9 },
+        copy: {
+          Carlos: { qui: C("OTIT", "Carlos"), sex: C("PACU", "Carlos"), seg: C("PACU", "Carlos"), ter: C("OTIT", "Carlos"), qua: C("OTIT", "Carlos") },
+          Raquel: { qui: C("OTIT", "Raquel"), sex: C("PACU", "Raquel"), seg: C("OTIT", "Raquel"), ter: C("OTIT", "Raquel"), qua: C("PACU", "Raquel") },
+          Clara:  { qui: C("PACU", "Clara"), sex: C("OTIT", "Clara"), seg: C("OTIT", "Clara"), ter: C("PACU", "Clara"), qua: C("OTIT", "Clara", { gordura: true, id: "OTIT (PS)" }) },
+        },
+        edit: {
+          Walison: {
+            sex: [C("OTIT", "Carlos", { slot: 1 }), C("PACU", "Clara", { slot: 2 })],
+            seg: [C("PACU", "Carlos")],
+            ter: [C("OTIT", "Raquel", { slot: 1 }), C("PACU", "Carlos", { slot: 2 })],
+            qua: [C("OTIT", "Carlos")],
+            qui: [C("PACU", "Raquel", { slot: 1 }), C("OTIT", "Clara", { slot: 2, gordura: true, id: "OTIT (PS)" })],
+          },
+          Mariana: {
+            sex: [C("OTIT", "Raquel")],
+            seg: [C("OTIT", "Clara", { slot: 1 }), C("PACU", "Raquel", { slot: 2 })],
+            ter: [C("OTIT", "Clara")],
+            qua: [C("PACU", "Clara", { slot: 1 }), C("OTIT", "Raquel", { slot: 2 })],
+            qui: [C("OTIT", "Carlos")],
+          },
+        },
+        carryOut: [{ uid: "doc-s6-otit", id: "OTIT-CL (doc S6)", offer: "OTIT", by: "Clara", gordura: true }],
+      };
+      // gordura que ENTROU na Semana 6 do doc (PACU-MA da semana 5, finalizado seg)
+      s.weeks[-1] = { num: -1, meta: {}, copy: {}, edit: {}, carryOut: [{ uid: "doc-s5-pacu", id: "PACU-MA (doc S5)", offer: "PACU", gordura: true }] };
+    }
+    function save() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(STATE)); } catch (e) {}
+    }
+
+    function ensureWeek(state, num) {
+      if (!state.weeks[num]) {
+        state.weeks[num] = {
+          num,
+          meta: defaultMeta(state.config),
+          copy: {},
+          edit: {},
+          carryOut: [],
+        };
+      }
+      return state.weeks[num];
+    }
+    // começa zerado: o usuário digita as quantidades na barra e gera
+    function defaultMeta(cfg) {
+      const meta = {};
+      activeOffers(cfg).forEach((o) => (meta[o.code] = 0));
+      return meta;
+    }
+
+    /* ============================================================
+       ENGINE — geração automática da semana
+       ============================================================ */
+    function generateWeek(num) {
+      const cfg = STATE.config;
+      const week = ensureWeek(STATE, num);
+
+      // ---- pool de levas a partir das quantidades
+      let pool = [];
+      Object.entries(week.meta).forEach(([code, q]) => {
+        for (let i = 0; i < q; i++) pool.push(code);
+      });
+      shuffle(pool);
+
+      const copies = cfg.copyTeam.filter((p) => p.active).map((p) => p.name);
+      const siglaOf = {};
+      cfg.copyTeam.forEach((p) => (siglaOf[p.name] = p.sigla || ""));
+      const nomen = makeNomenclator(cfg);
+
+      // contador de nº de ad por copy+oferta (continua de onde parou)
+      const adsPer = +cfg.adsPorLeva || 5;
+      const adCounter = {};
+      function takeRange(copyName, offer) {
+        if (!adCounter[copyName]) adCounter[copyName] = {};
+        if (adCounter[copyName][offer] == null)
+          adCounter[copyName][offer] = lastAdUsed(cfg, copyName, offer, num);
+        const n1 = adCounter[copyName][offer] + 1;
+        const n2 = n1 + adsPer - 1;
+        adCounter[copyName][offer] = n2;
+        return [n1, n2];
+      }
+
+      // ---- COPY: dia a dia, misturando ofertas no dia e sem repetir por pessoa
+      const copy = {};
+      copies.forEach((p) => (copy[p] = {}));
+      // anti-repetição contínua entre semanas: o 1º dia desta semana evita
+      // a oferta que cada copy escreveu no ÚLTIMO dia da semana anterior
+      const lastOffer = {};
+      const prevW = STATE.weeks[num - 1];
+      if (prevW && prevW.copy) {
+        copies.forEach((p) => {
+          const row = prevW.copy[p];
+          if (!row) return;
+          for (let i = COPY_WORK.length - 1; i >= 0; i--) {
+            const a = row[COPY_WORK[i].key];
+            if (a) { lastOffer[p] = a.offer; break; }
+          }
+        });
+      }
+      const flat = [];
+      const perDay = []; // levas por dia de escrita (alinha com o dia de edição)
+
+      for (const col of COPY_WORK) {
+        const todays = [];
+        const usedToday = []; // mistura o dia: evita todo mundo na mesma oferta
+        for (const p of copies) {
+          if (pool.length === 0) break;
+          // 1º: oferta != última da pessoa E ainda não usada hoje;
+          // 2º: oferta != última da pessoa; 3º: qualquer uma
+          let idx = pool.findIndex((o) => o !== lastOffer[p] && !usedToday.includes(o));
+          if (idx < 0) idx = pool.findIndex((o) => o !== lastOffer[p]);
+          if (idx < 0) idx = 0;
+          const code = pool.splice(idx, 1)[0];
+          usedToday.push(code);
+          const [n1, n2] = takeRange(p, code);
+          const a = { uid: uid(), id: nomen(code, siglaOf[p], n1, n2), offer: code, by: p, n1, n2, gordura: false };
+          copy[p][col.key] = a;
+          lastOffer[p] = code;
+          flat.push(a);
+          todays.push(a);
+        }
+        perDay.push(todays);
+      }
+
+      // rodízio de quem fica com a leva que atrasa (justiça entre os copys)
+      const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
+
+      // ---- EDIÇÃO: deriva do copy dia a dia (defasagem de 1 dia útil)
+      // a leva dupla intercala TAMBÉM entre semanas: quem dobrou no último
+      // dia da semana anterior NÃO dobra no primeiro dia desta
+      const lastDupla = findLastDupla(STATE.weeks[num - 1]);
+      const edit = buildEdit(cfg, perDay, rotPerson, lastDupla, lastOffersFromPrevEdit(STATE.weeks[num - 1]));
+
+      // ---- GORDURA: a leva 2 (secundária) leva 2 dias — pega num dia, entrega
+      // no outro. A leva 2 do ÚLTIMO dia de edição (quinta) só entrega depois
+      // do fim de semana → finaliza segunda → conta na PRÓXIMA semana.
+      week.carryOut = [];
+      const lastIdx = Math.min(EDIT_WORK.length, perDay.length) - 1;
+      const lastKey = lastIdx >= 0 ? EDIT_WORK[lastIdx].key : null;
+      if (lastKey) {
+        Object.values(edit).forEach((row) => {
+          (row[lastKey] || []).forEach((c) => {
+            if (c.slot === 2) {
+              c.gordura = true;
+              const orig = flat.find((f) => f.uid === c.uid);
+              if (orig) {
+                orig.gordura = true; // marca também no board de COPY (PS)
+                week.carryOut.push({ ...orig });
+              }
+            }
+          });
+        });
+      }
+
+      week.copy = copy;
+      week.edit = edit;
+      save();
+      render();
+      toast(`Semana ${num} gerada · ${flat.length} levas distribuídas`, "ok");
+    }
+
+    /* Distribui a edição — regra do "dia sim, dia não".
+       - O que o copy escreve no dia i é editado no dia útil seguinte
+         (COPY_WORK[i] → EDIT_WORK[i]: QUI→SEX, SEX→SEG, SEG→TER, TER→QUA, QUA→QUI).
+       - Cada dia chegam N levas (uma por copy). Cada editor pega a PRIMÁRIA (leva 1);
+         a sobra vira SECUNDÁRIA (leva 2) de UM editor por dia — a leva dupla —
+         alternando quem dobra a cada dia (dia sim, dia não). Nunca os dois no
+         mesmo dia: só há 3 copies, não teria criativo e criaria defasagem.
+       - Tapa-buraco (Leandro) só entra se a carga do dia não couber nos titulares. */
+    function buildEdit(cfg, perDay, rotPerson, lastDupla, initLastOffer) {
+      const mains = cfg.editTeam.filter((p) => p.active && !p.backup).map((p) => p.name);
+      const backups = cfg.editTeam.filter((p) => p.active && p.backup).map((p) => p.name);
+
+      const maxDia = Math.max(0, ...perDay.map((d) => d.length));
+      let editors = mains.slice();
+      while (editors.length * 2 < maxDia && backups.length) editors.push(backups.shift());
+      if (editors.length === 0 && backups.length) editors = [backups.shift()];
+      if (editors.length === 0) return {};
+
+      const edit = {};
+      editors.forEach((p) => {
+        edit[p] = {};
+        EDIT_WORK.forEach((c) => (edit[p][c.key] = []));
+      });
+
+      // herda a última oferta editada por cada um na semana anterior
+      const lastOffer = { ...(initLastOffer || {}) };
+      const lastIdx = Math.min(EDIT_WORK.length, perDay.length) - 1;
+
+      // continua o rodízio da dupla de onde a semana anterior parou
+      let duplaTurn = 0;
+      if (lastDupla) {
+        const li = editors.indexOf(lastDupla);
+        if (li >= 0) duplaTurn = li + 1;
+      }
+
+      for (let i = 0; i < EDIT_WORK.length && i < perDay.length; i++) {
+        const col = EDIT_WORK[i];
+        const dayQueue = perDay[i].slice();
+        if (!dayQueue.length) continue;
+
+        // último dia: a leva do copy da vez (rodízio) fica reservada para
+        // ser a leva 2 → vira a gordura da semana
+        const isLastDay = i === lastIdx;
+
+        // quem está na vez da leva dupla hoje (rotação contínua entre semanas)
+        const duplaIdx = duplaTurn % editors.length;
+
+        // 1) primárias: um por editor, evitando repetir a oferta do dia anterior
+        for (const p of editors) {
+          if (!dayQueue.length) break;
+          const a = pickCard(dayQueue, {
+            avoidOffer: lastOffer[p],
+            avoidBy: isLastDay ? rotPerson : null,
+          });
+          edit[p][col.key].push({ ...a, slot: null });
+          lastOffer[p] = a.offer;
+        }
+
+        // 2) sobras = secundárias (leva 2), começando por quem está na vez da dupla
+        let firstDupla = null;
+        while (dayQueue.length) {
+          let placed = false;
+          for (let k = 0; k < editors.length; k++) {
+            const p = editors[(duplaIdx + k) % editors.length];
+            const cell = edit[p][col.key];
+            if (cell.length < 2) {
+              const primary = cell[0];
+              const a = pickCard(dayQueue, {
+                avoidOffer: primary ? primary.offer : null,
+                preferBy: isLastDay ? rotPerson : null,
+              });
+              if (primary) primary.slot = 1;
+              cell.push({ ...a, slot: 2 });
+              lastOffer[p] = a.offer;
+              if (!firstDupla) firstDupla = p;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            // dia estourado (todo mundo já com dupla): despeja em rodízio mesmo
+            const p = editors[duplaIdx];
+            const a = dayQueue.shift();
+            edit[p][col.key].push({ ...a, slot: 2 });
+          }
+        }
+        // avança a vez a partir de quem REALMENTE dobrou hoje
+        if (firstDupla) duplaTurn = editors.indexOf(firstDupla) + 1;
+      }
+
+      return edit;
+    }
+    /* Última oferta que cada editor editou na semana anterior (para a
+       anti-repetição continuar na virada de semana) */
+    function lastOffersFromPrevEdit(prevWeek) {
+      const res = {};
+      if (!prevWeek || !prevWeek.edit) return res;
+      Object.entries(prevWeek.edit).forEach(([person, row]) => {
+        for (let i = EDIT_WORK.length - 1; i >= 0; i--) {
+          const arr = row[EDIT_WORK[i].key] || [];
+          if (arr.length) {
+            res[person] = arr[arr.length - 1].offer;
+            break;
+          }
+        }
+      });
+      return res;
+    }
+
+    /* Quem pegou a última leva dupla da semana anterior (para a
+       intercalação dia sim/dia não continuar entre semanas) */
+    function findLastDupla(prevWeek) {
+      if (!prevWeek || !prevWeek.edit) return null;
+      for (let i = EDIT_WORK.length - 1; i >= 0; i--) {
+        const key = EDIT_WORK[i].key;
+        for (const [person, row] of Object.entries(prevWeek.edit)) {
+          if ((row[key] || []).some((c) => c && c.slot === 2)) return person;
+        }
+      }
+      return null;
+    }
+
+    /* Escolhe a melhor leva da fila por pontuação:
+       manter a leva do copy da vez p/ gordura > variar oferta */
+    function pickCard(queue, { avoidOffer, avoidBy, preferBy } = {}) {
+      const score = (a) =>
+        (preferBy && a.by === preferBy ? -2 : 0) +
+        (avoidBy && a.by === avoidBy ? 2 : 0) +
+        (avoidOffer && a.offer === avoidOffer ? 1 : 0);
+      let best = 0;
+      for (let i = 1; i < queue.length; i++) if (score(queue[i]) < score(queue[best])) best = i;
+      return queue.splice(best, 1)[0];
+    }
+
+    /* Formata o nome do ad. Ex.: AD_CA-PACU80-84
+       Tokens: {COPY} sigla do copy · {OFERTA} · {ini}/{fim} range de ads */
+    function makeNomenclator(cfg) {
+      return (code, sigla, n1, n2) =>
+        (cfg.nomenclature || "AD_{COPY}-{OFERTA}{ini}-{fim}")
+          .replaceAll("{COPY}", sigla || "")
+          .replaceAll("{OFERTA}", code)
+          .replaceAll("{ini}", n1 != null ? String(n1) : "")
+          .replaceAll("{fim}", n2 != null ? String(n2) : "")
+          .replace(/-+$/, "");
+    }
+
+    /* Último nº de ad já usado por (copy, oferta): parte da base do config
+       e considera o maior número de qualquer semana ANTERIOR à atual.
+       Assim a contagem continua sozinha de semana pra semana. */
+    function lastAdUsed(cfg, copyName, offer, weekNum) {
+      let mx = (cfg.adBase && cfg.adBase[copyName] && cfg.adBase[copyName][offer]) || 0;
+      Object.values(STATE.weeks).forEach((w) => {
+        if (!w || w.num >= weekNum || !w.copy) return;
+        const row = w.copy[copyName];
+        if (!row) return;
+        Object.values(row).forEach((c) => {
+          if (c && c.offer === offer && typeof c.n2 === "number") mx = Math.max(mx, c.n2);
+        });
+      });
+      return mx;
+    }
+
+    /* ============================================================
+       CONTAGEM — considera gordura (carry-in da semana anterior)
+       ============================================================ */
+    function countByOffer(week) {
+      const counts = {};
+      const cfg = STATE.config;
+      cfg.offers.forEach((o) => (counts[o.code] = { placed: 0, gorduraOut: 0, carryIn: 0 }));
+
+      Object.values(week.copy || {}).forEach((row) => {
+        Object.values(row).forEach((a) => {
+          if (!a) return;
+          counts[a.offer] = counts[a.offer] || { placed: 0, gorduraOut: 0, carryIn: 0 };
+          counts[a.offer].placed++;
+          if (a.gordura) counts[a.offer].gorduraOut++;
+        });
+      });
+
+      const prev = STATE.weeks[week.num - 1];
+      if (prev && prev.carryOut) {
+        prev.carryOut.forEach((a) => {
+          counts[a.offer] = counts[a.offer] || { placed: 0, gorduraOut: 0, carryIn: 0 };
+          counts[a.offer].carryIn++;
+        });
+      }
+      return counts;
+    }
+
+    /* ============================================================
+       RENDER
+       ============================================================ */
+    // cada semana anda 7 dias a partir da quinta configurada (Semana 1)
+    function weekStartISO(num) {
+      return addDaysISO(STATE.config.weekStart, (num - 1) * 7);
+    }
+
+    function render() {
+      const week = ensureWeek(STATE, STATE.current);
+      document.getElementById("weekTitle").textContent =
+        (week.num === 0 ? "Semana 0 · doc S6" : `Semana ${week.num}`) + (week.locked ? " 🔒" : "");
+
+      const lockBtn = document.getElementById("lockWeek");
+      if (lockBtn) {
+        lockBtn.textContent = week.locked ? "🔒 Travada" : "🔓 Travar";
+        lockBtn.classList.toggle("locked", !!week.locked);
+        lockBtn.title = week.locked
+          ? "Semana REAL protegida — clique para destravar"
+          : "Travar: marca como semana REAL e impede regerar por cima";
+      }
+      document.getElementById("generateBtn").disabled = !!week.locked;
+      const start = weekStartISO(week.num);
+      document.getElementById("weekDates").textContent =
+        `${fmtBR(start)} – ${fmtBR(addDaysISO(start, 6))}`;
+
+      renderMetaBar(week);
+      renderBoard("copy", week);
+      renderBoard("edit", week);
+
+      // legenda: cor de cada copy
+      const leg = document.getElementById("copyLegend");
+      if (leg) {
+        leg.innerHTML = STATE.config.copyTeam
+          .filter((p) => p.active)
+          .map((p) => `<span><i class="pdot" style="background:${p.color || "#8a91a3"};margin-right:5px;vertical-align:middle"></i>${p.name}</span>`)
+          .join("");
+      }
+
+      renderTraffic(week);
+      save();
+    }
+
+    /* ============================================================
+       ABA TRÁFEGO — o lote que SOBE no sábado
+       Regra (confirmada pelo usuário): a leva inteira da semana sobe de
+       uma vez no sábado. Sobe tudo que finaliza a tempo:
+         + leva 1/2 desta semana que NÃO é gordura
+         + gordura recebida da semana anterior (finalizou na segunda)
+         − a gordura desta semana (leva 2 da quinta) → vai pro próximo sábado
+       O total por oferta bate com o "sobe X" do contador. */
+    function uploadSaturdayISO(num) {
+      // quinta da semana + 9 dias = sábado após o fim da edição (QUI+2)
+      return addDaysISO(weekStartISO(num), 9);
+    }
+    function editorOfUid(week, wantUid) {
+      if (!week || !week.edit) return null;
+      for (const [person, row] of Object.entries(week.edit)) {
+        for (const c of Object.values(row)) {
+          if ((c || []).some((x) => x.uid === wantUid)) return person;
+        }
+      }
+      return null;
+    }
+
+    function renderTraffic(week) {
+      const cfg = STATE.config;
+      const satEl = document.getElementById("satDate");
+      const sub = document.getElementById("satSub");
+      const offBox = document.getElementById("trafficOffers");
+      const gordBox = document.getElementById("trafficGordura");
+      const totalEl = document.getElementById("trafficTotal");
+      if (!offBox) return;
+
+      const sat = uploadSaturdayISO(week.num);
+      satEl.textContent = fmtBR(sat);
+
+      // 1) coleta do board de edição desta semana
+      const goesUp = []; // sobe neste sábado
+      const stays = []; // gordura desta semana → próximo sábado
+      Object.entries(week.edit || {}).forEach(([editor, row]) => {
+        Object.values(row).forEach((arr) => {
+          (arr || []).forEach((c) => {
+            const item = { name: c.id, offer: c.offer, by: c.by, editor, gordura: !!c.gordura };
+            (c.gordura ? stays : goesUp).push(item);
+          });
+        });
+      });
+
+      // 2) gordura recebida da semana anterior (finalizou segunda → sobe agora)
+      const prev = STATE.weeks[week.num - 1];
+      const carryIn = [];
+      if (prev && prev.carryOut) {
+        prev.carryOut.forEach((c) => {
+          carryIn.push({
+            name: c.id, offer: c.offer, by: c.by,
+            editor: editorOfUid(prev, c.uid) || "—",
+            gordura: true, received: true,
+          });
+        });
+      }
+
+      const all = goesUp.concat(carryIn);
+
+      if (all.length === 0 && stays.length === 0) {
+        sub.textContent = "Gere a semana no Planejamento primeiro.";
+        offBox.innerHTML = `<div class="traffic-empty">Nada pronto ainda.</div>`;
+        gordBox.innerHTML = "";
+        totalEl.innerHTML = "";
+        return;
+      }
+      sub.textContent = `Leva da ${week.num === 0 ? "Semana 0 (doc S6)" : "Semana " + week.num} — sobe tudo de uma vez.`;
+      totalEl.innerHTML = `<b>${all.length}</b><small>criativos sobem</small>`;
+
+      // 3) agrupa por oferta (ordem das ofertas do config)
+      const byOffer = {};
+      all.forEach((it) => (byOffer[it.offer] = byOffer[it.offer] || []).push(it));
+      const order = cfg.offers.map((o) => o.code).filter((c) => byOffer[c]);
+      Object.keys(byOffer).forEach((c) => { if (!order.includes(c)) order.push(c); });
+
+      const dotOf = (name) => {
+        const p = cfg.copyTeam.find((x) => x.name === name);
+        return p ? p.color : "#8a91a3";
+      };
+      const siglaOf = (name) => {
+        const p = cfg.copyTeam.find((x) => x.name === name);
+        return p ? p.sigla : "";
+      };
+
+      offBox.innerHTML = order
+        .map((code) => {
+          const list = byOffer[code];
+          const col = offerColor(cfg, code);
+          const rows = list
+            .map(
+              (it) => `
+            <div class="trow" style="border-left-color:${dotOf(it.by)}">
+              <span class="tname">${it.name}</span>
+              ${it.received ? '<span class="gb">recebida</span>' : ""}
+              <span class="tmeta">
+                <span class="who"><i style="background:${dotOf(it.by)}"></i>${siglaOf(it.by) || it.by || "?"}</span>
+                <span title="editor">✎ ${it.editor}</span>
+              </span>
+            </div>`
+            )
+            .join("");
+          return `
+          <div class="toff">
+            <div class="toff-head">
+              <span class="oc" style="background:${col}">${code.slice(0, 2)}</span>
+              <b>${code}</b><span class="cnt" style="color:${col}">${list.length}</span>
+            </div>
+            <div class="toff-list">${rows}</div>
+          </div>`;
+        })
+        .join("");
+
+      // 4) caixa da gordura (fica pra próxima)
+      if (stays.length) {
+        const nextSat = fmtBR(uploadSaturdayISO(week.num + 1));
+        gordBox.innerHTML = `
+          <div class="gordura-box">
+            <h3>⏭ Fica pra próxima semana (gordura) — sobe no sábado ${nextSat}</h3>
+            <p class="sub">Leva 2 da quinta: só finaliza na segunda, não dá tempo pra este sábado.</p>
+            ${stays
+              .map(
+                (it) => `<span class="grow"><b>${it.name}</b> · ${siglaOf(it.by) || it.by || "?"} · ✎ ${it.editor}</span>`
+              )
+              .join("")}
+          </div>`;
+      } else {
+        gordBox.innerHTML = "";
+      }
+    }
+
+    /* Barra principal: quantidade editável por oferta + contadores */
+    function renderMetaBar(week) {
+      const bar = document.getElementById("metaBar");
+      const cfg = STATE.config;
+      const counts = countByOffer(week);
+      const offs = activeOffers(cfg);
+      bar.innerHTML = "";
+
+      if (offs.length === 0) {
+        bar.innerHTML = `<span class="meta-empty">Nenhuma oferta ativa. Abra ⚙ Config e ative/cadastre as ofertas.</span>`;
+        return;
+      }
+
+      const hasCards = Object.values(week.copy || {}).some((r) => Object.values(r).some(Boolean));
+      if (!hasCards) {
+        const hint = document.createElement("div");
+        hint.className = "meta-hint";
+        hint.textContent = "1) Digite a quantidade de cada oferta  →  2) Clique em ⚡ Gerar semana. O sistema divide entre copys e editores.";
+        bar.appendChild(hint);
+      }
+
+      offs.forEach((o) => {
+        if (!(o.code in week.meta)) week.meta[o.code] = 0;
+        const meta = week.meta[o.code] || 0;
+        const c = counts[o.code];
+        const effective = c.placed - c.gorduraOut + c.carryIn;
+        const remaining = meta - c.placed;
+        const chip = document.createElement("div");
+        chip.className =
+          "meta-chip" +
+          (meta > 0 && remaining === 0 ? " done" : "") +
+          (remaining < 0 ? " over" : "");
+        chip.innerHTML = `
+          <span class="oc" style="background:${o.color}">${o.code.slice(0, 2)}</span>
+          <div class="info">
+            <b>${o.code}</b>
+            <small>${
+              c.placed
+                ? `${c.placed} na semana${c.carryIn ? ` · +${c.carryIn} gordura` : ""}${c.gorduraOut ? ` · ${c.gorduraOut}→próx` : ""} · sobe ${effective}`
+                : "quantas levas?"
+            }</small>
+          </div>`;
+        const inp = document.createElement("input");
+        inp.type = "number";
+        inp.min = "0";
+        inp.className = "qty";
+        inp.value = meta;
+        inp.title = `Meta de ${o.code} na semana`;
+        inp.addEventListener("input", (e) => {
+          week.meta[o.code] = +e.target.value || 0;
+          save();
+          updateTotalChip(week);
+        });
+        chip.appendChild(inp);
+        bar.appendChild(chip);
+      });
+
+      const total = document.createElement("div");
+      total.className = "meta-chip total";
+      total.id = "totalChip";
+      bar.appendChild(total);
+      updateTotalChip(week);
+
+      // contadores dos boards
+      let copyN = 0;
+      Object.values(week.copy || {}).forEach((r) => Object.values(r).forEach((a) => a && copyN++));
+      let editN = 0;
+      Object.values(week.edit || {}).forEach((r) =>
+        Object.values(r).forEach((arr) => (editN += (arr || []).length))
+      );
+      document.getElementById("copyCount").textContent = copyN;
+      document.getElementById("editCount").textContent = editN;
+    }
+
+    function metaTarget() {
+      return STATE.config.copyTeam.filter((p) => p.active).length * (+STATE.config.levasPerCopy || 0);
+    }
+    function updateTotalChip(week) {
+      const el = document.getElementById("totalChip");
+      if (!el) return;
+      const sum = Object.values(week.meta).reduce((a, b) => a + (+b || 0), 0);
+      const t = metaTarget();
+      el.classList.toggle("ok", sum === t);
+      el.classList.toggle("bad", sum !== t);
+      el.innerHTML = `<div class="info"><b>Total ${sum}/${t}</b><small>${
+        sum === t
+          ? "fecha certinho ✓"
+          : sum < t
+          ? `faltam ${t - sum} p/ preencher a capacidade`
+          : `${sum - t} acima da capacidade dos copys`
+      }</small></div>`;
+    }
+
+    function renderBoard(kind, week) {
+      const cfg = STATE.config;
+      const cols = kind === "copy" ? COPY_COLS : EDIT_COLS;
+      const people =
+        kind === "copy"
+          ? cfg.copyTeam.filter((p) => p.active)
+          : cfg.editTeam.filter((p) => p.active);
+      const gridEl = document.getElementById(kind === "copy" ? "copyGrid" : "editGrid");
+      const start = weekStartISO(week.num);
+
+      gridEl.style.gridTemplateColumns = `140px repeat(${cols.length}, minmax(96px, 1fr))`;
+      gridEl.innerHTML = "";
+
+      const corner = document.createElement("div");
+      corner.className = "corner";
+      gridEl.appendChild(corner);
+
+      const tISO = todayISO();
+      cols.forEach((col) => {
+        const colISO = addDaysISO(start, col.off);
+        const h = document.createElement("div");
+        let cls = "head";
+        if (col.weekend) cls += " weekend";
+        if (DEADLINES[kind][col.key]) cls += " " + DEADLINES[kind][col.key];
+        if (colISO === tISO) cls += " today";
+        h.className = cls;
+        h.innerHTML = `${col.label}<small>${fmtBR(colISO)}</small>${colISO === tISO ? '<em class="today-tag">hoje</em>' : ""}`;
+        gridEl.appendChild(h);
+      });
+
+      people.forEach((person) => {
+        const rh = document.createElement("div");
+        rh.className = "rowhead" + (person.backup ? " backup" : "");
+        const dot = person.color ? `<i class="pdot" style="background:${person.color}"></i>` : "";
+        rh.innerHTML = `${dot}<span>${person.name}</span>`;
+        gridEl.appendChild(rh);
+
+        cols.forEach((col) => {
+          const cell = document.createElement("div");
+          const isToday = addDaysISO(start, col.off) === tISO;
+          cell.className = "cell" + (col.weekend ? " weekend" : "") + (isToday ? " today" : "");
+          cell.dataset.kind = kind;
+          cell.dataset.person = person.name;
+          cell.dataset.col = col.key;
+
+          const store = week[kind][person.name];
+          if (store) {
+            if (kind === "copy") {
+              const a = store[col.key];
+              if (a) cell.appendChild(makeCard(a, cfg, kind, person.name, col.key));
+            } else {
+              (store[col.key] || []).forEach((a) =>
+                cell.appendChild(makeCard(a, cfg, kind, person.name, col.key))
+              );
+            }
+          }
+          attachDrop(cell);
+          gridEl.appendChild(cell);
+        });
+      });
+    }
+
+    function makeCard(a, cfg, kind, person, colKey) {
+      const el = document.createElement("div");
+      const active = cfg.offers.find((o) => o.code === a.offer && o.active);
+      el.className = "card" + (active ? "" : " off");
+      el.style.background = offerColor(cfg, a.offer);
+      // barrinha lateral na cor do copy que escreveu (identificação rápida)
+      const author = cfg.copyTeam.find((x) => x.name === a.by);
+      if (author && author.color) el.style.borderLeft = `6px solid ${author.color}`;
+      el.draggable = true;
+      el.dataset.uid = a.uid;
+      if (author) el.title = `Copy: ${author.name}`;
+
+      let badges = "";
+      if (a.gordura) badges += `<span class="b" style="background:var(--yellow);color:#0d0f14">G</span>`;
+
+      // COPY: mostra só a oferta (visual limpo, facilita arrastar entre pessoas).
+      //        Numeração fica interna, pra integração/export com ClickUp.
+      // EDIÇÃO: mostra {sigla_copy}-{OFERTA}{2?} — ex.: CA-OTIT, CL-PACU2.
+      //         Só marca "2" na leva secundária (dupla). Primária/única: sem sufixo.
+      //         Ao arrastar no COPY, o {by} muda e o rótulo aqui atualiza sozinho.
+      let label = a.offer;
+      if (kind === "edit") {
+        const auSig = (author && author.sigla) || (a.by ? a.by.slice(0, 2).toUpperCase() : "");
+        label = `${auSig}-${a.offer}${a.slot === 2 ? "2" : ""}`;
+        el.title = `${a.id || ""}${a.id ? " · " : ""}Copy: ${a.by} · Editor: ${person}`;
+      } else if (a.id) {
+        el.title += ` · ${a.id}`;
+      }
+
+      el.innerHTML = `<span class="cid">${label}</span><span class="cbadges">${badges}</span>`;
+      el.addEventListener("dragstart", (e) => {
+        el.classList.add("dragging");
+        e.dataTransfer.setData("text/plain", JSON.stringify({ uid: a.uid, kind, person, colKey }));
+      });
+      el.addEventListener("dragend", () => el.classList.remove("dragging"));
+      return el;
+    }
+
+    /* ---------- Drag & drop (só dentro do mesmo board) ---------- */
+    function attachDrop(cell) {
+      cell.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        cell.classList.add("dragover");
+      });
+      cell.addEventListener("dragleave", () => cell.classList.remove("dragover"));
+      cell.addEventListener("drop", (e) => {
+        e.preventDefault();
+        cell.classList.remove("dragover");
+        let data;
+        try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+        if (data.kind !== cell.dataset.kind) {
+          toast("Mova cards dentro do mesmo board (Copy ou Edição).", "warn");
+          return;
+        }
+        if (cell.dataset.col === "sab" || cell.dataset.col === "dom") {
+          toast("Fim de semana é folga.", "warn");
+          return;
+        }
+        moveCard(data, { kind: cell.dataset.kind, person: cell.dataset.person, colKey: cell.dataset.col });
+      });
+    }
+
+    function moveCard(from, to) {
+      const week = ensureWeek(STATE, STATE.current);
+      let card;
+      if (from.kind === "copy") {
+        const cellA = week.copy[from.person]?.[from.colKey];
+        if (!cellA || cellA.uid !== from.uid) return;
+        card = cellA;
+        week.copy[from.person][from.colKey] = null;
+        if (!week.copy[to.person]) week.copy[to.person] = {};
+        const occ = week.copy[to.person][to.colKey];
+        // atualiza autoria: quem passar a ficar na célula da nova pessoa,
+        // vira "escrito por" ela — o rótulo do EDIT segue essa autoria
+        card.by = to.person;
+        week.copy[to.person][to.colKey] = card;
+        if (occ) {
+          occ.by = from.person;
+          week.copy[from.person][from.colKey] = occ; // swap
+        }
+        renumberWeek(week);
+      } else {
+        const arr = week.edit[from.person]?.[from.colKey] || [];
+        const i = arr.findIndex((a) => a.uid === from.uid);
+        if (i < 0) return;
+        card = arr.splice(i, 1)[0];
+        if (!week.edit[to.person]) week.edit[to.person] = {};
+        if (!week.edit[to.person][to.colKey]) week.edit[to.person][to.colKey] = [];
+        week.edit[to.person][to.colKey].push(card);
+      }
+      save();
+      render();
+    }
+
+    /* Recalcula id/n1/n2 de TODOS os cards da semana a partir da grade de COPY
+       atual. Chamada após arrastar cards, pra manter a numeração consistente
+       com a nova ordem de autoria. Reflete também nos cards da EDIÇÃO (mesmo uid). */
+    function renumberWeek(week) {
+      const cfg = STATE.config;
+      const nomen = makeNomenclator(cfg);
+      const adsPer = +cfg.adsPorLeva || 5;
+      const counter = {}; // {copy: {offer: nextStart-1}}
+      const patched = {}; // uid → novos {id, n1, n2, by}
+
+      COPY_WORK.forEach((col) => {
+        Object.entries(week.copy).forEach(([person, row]) => {
+          const c = row && row[col.key];
+          if (!c) return;
+          if (!counter[person]) counter[person] = {};
+          if (counter[person][c.offer] == null)
+            counter[person][c.offer] = lastAdUsed(cfg, person, c.offer, week.num);
+          const n1 = counter[person][c.offer] + 1;
+          const n2 = n1 + adsPer - 1;
+          counter[person][c.offer] = n2;
+          const sigla = (cfg.copyTeam.find((p) => p.name === person) || {}).sigla || "";
+          c.by = person;
+          c.n1 = n1;
+          c.n2 = n2;
+          c.id = nomen(c.offer, sigla, n1, n2);
+          patched[c.uid] = { id: c.id, n1, n2, by: person };
+        });
+      });
+
+      // propaga pros cards do EDIT que compartilham o mesmo uid
+      Object.values(week.edit || {}).forEach((row) =>
+        Object.values(row || {}).forEach((arr) =>
+          (arr || []).forEach((c) => {
+            const p = c && patched[c.uid];
+            if (p) Object.assign(c, p);
+          })
+        )
+      );
+    }
+
+    /* ============================================================
+       MODAL DE CONFIG
+       ============================================================ */
+    function openConfig() {
+      const cfg = STATE.config;
+      renderOffersList();
+      renderTeamList("copy");
+      renderTeamList("edit");
+      document.getElementById("levasPerCopy").value = cfg.levasPerCopy;
+      document.getElementById("adsPorLeva").value = cfg.adsPorLeva;
+      document.getElementById("nomenclature").value = cfg.nomenclature;
+      document.getElementById("weekStart").value = cfg.weekStart;
+      renderAdBaseGrid();
+      document.getElementById("configModal").classList.remove("hidden");
+    }
+
+    /* Grade editável: último nº de ad por copy × oferta */
+    function renderAdBaseGrid() {
+      const cfg = STATE.config;
+      const wrap = document.getElementById("adBaseGrid");
+      const copies = cfg.copyTeam.filter((p) => p.active);
+      const offers = cfg.offers.filter((o) => o.active);
+      if (!cfg.adBase) cfg.adBase = {};
+      let html = `<table style="border-collapse:collapse;font-size:12px"><tr><td></td>`;
+      offers.forEach((o) => (html += `<th style="padding:4px 8px;color:${o.color}">${o.code}</th>`));
+      html += `</tr>`;
+      copies.forEach((p) => {
+        html += `<tr><td style="padding:4px 8px;font-weight:600">${p.name}</td>`;
+        offers.forEach((o) => {
+          const v = (cfg.adBase[p.name] && cfg.adBase[p.name][o.code]) || 0;
+          html += `<td style="padding:2px 4px"><input type="number" min="0" value="${v}" data-copy="${p.name}" data-offer="${o.code}" style="width:64px;text-align:center" /></td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</table>`;
+      wrap.innerHTML = html;
+      wrap.querySelectorAll("input").forEach((inp) =>
+        inp.addEventListener("input", (e) => {
+          const { copy, offer } = e.target.dataset;
+          if (!cfg.adBase[copy]) cfg.adBase[copy] = {};
+          cfg.adBase[copy][offer] = +e.target.value || 0;
+        })
+      );
+    }
+    function closeConfig() { document.getElementById("configModal").classList.add("hidden"); }
+
+    function renderOffersList() {
+      const wrap = document.getElementById("offersList");
+      wrap.innerHTML = "";
+      STATE.config.offers.forEach((o, i) => {
+        const row = document.createElement("div");
+        row.className = "mini-row";
+        row.innerHTML = `
+          <input type="color" class="swatch" value="${o.color}" data-i="${i}" data-f="color" />
+          <input type="text" value="${o.code}" data-i="${i}" data-f="code" maxlength="6" />
+          <label class="tgl"><input type="checkbox" ${o.active ? "checked" : ""} data-i="${i}" data-f="active" /> ativa</label>
+          <button class="del" data-del="${i}">×</button>`;
+        wrap.appendChild(row);
+      });
+      wrap.querySelectorAll("input").forEach((inp) =>
+        inp.addEventListener("input", (e) => {
+          const { i, f } = e.target.dataset;
+          const o = STATE.config.offers[i];
+          if (f === "active") o.active = e.target.checked;
+          else if (f === "code") o.code = e.target.value.toUpperCase();
+          else o.color = e.target.value;
+        })
+      );
+      wrap.querySelectorAll("[data-del]").forEach((b) =>
+        b.addEventListener("click", () => {
+          STATE.config.offers.splice(+b.dataset.del, 1);
+          renderOffersList();
+        })
+      );
+    }
+
+    function renderTeamList(kind) {
+      const key = kind === "copy" ? "copyTeam" : "editTeam";
+      const wrap = document.getElementById(kind === "copy" ? "copyTeamList" : "editTeamList");
+      wrap.innerHTML = "";
+      STATE.config[key].forEach((p, i) => {
+        const row = document.createElement("div");
+        row.className = "mini-row";
+        const backupTgl =
+          kind === "edit"
+            ? `<label class="tgl"><input type="checkbox" ${p.backup ? "checked" : ""} data-i="${i}" data-f="backup" /> tapa-buraco</label>`
+            : "";
+        const siglaInp =
+          kind === "copy"
+            ? `<input type="color" class="swatch" value="${p.color || "#8a91a3"}" data-i="${i}" data-f="color" title="Cor do copy" /><input type="text" value="${p.sigla || ""}" data-i="${i}" data-f="sigla" maxlength="3" title="Sigla no nome do ad" style="width:46px;flex:none;text-transform:uppercase;text-align:center" />`
+            : "";
+        row.innerHTML = `
+          <input type="text" value="${p.name}" data-i="${i}" data-f="name" />
+          ${siglaInp}
+          <label class="tgl"><input type="checkbox" ${p.active ? "checked" : ""} data-i="${i}" data-f="active" /> ativo</label>
+          ${backupTgl}
+          <button class="del" data-del="${i}">×</button>`;
+        wrap.appendChild(row);
+      });
+      wrap.querySelectorAll("input").forEach((inp) =>
+        inp.addEventListener("input", (e) => {
+          const { i, f } = e.target.dataset;
+          const p = STATE.config[key][i];
+          if (f === "name") p.name = e.target.value;
+          else if (f === "sigla") p.sigla = e.target.value.toUpperCase();
+          else if (f === "color") p.color = e.target.value;
+          else p[f] = e.target.checked;
+        })
+      );
+      wrap.querySelectorAll("[data-del]").forEach((b) =>
+        b.addEventListener("click", () => {
+          STATE.config[key].splice(+b.dataset.del, 1);
+          renderTeamList(kind);
+        })
+      );
+    }
+
+    /* ============================================================
+       EXPORT (print para o Matheus)
+       ============================================================ */
+    function exportPrint() {
+      const week = ensureWeek(STATE, STATE.current);
+      const counts = countByOffer(week);
+      const cfg = STATE.config;
+      const ws = weekStartISO(week.num);
+      let txt = `📋 TASK DIÁRIAS · Semana ${week.num} (${fmtBR(ws)}–${fmtBR(addDaysISO(ws, 6))})\n`;
+      txt += `\n— CONTAGEM (o que sobe no tráfego) —\n`;
+      activeOffers(cfg).forEach((o) => {
+        const c = counts[o.code];
+        const eff = c.placed - c.gorduraOut + c.carryIn;
+        if (eff || c.placed)
+          txt += `${o.code}: ${eff}${c.carryIn ? ` (+${c.carryIn} gordura)` : ""}${c.gorduraOut ? ` (${c.gorduraOut} p/ próx.)` : ""}\n`;
+      });
+
+      txt += `\n— COPY —\n`;
+      cfg.copyTeam.filter((p) => p.active).forEach((p) => {
+        const cells = COPY_WORK.map((c) => {
+          const a = week.copy[p.name]?.[c.key];
+          return a ? `${c.label}:${a.offer}${a.gordura ? "(G)" : ""}` : `${c.label}:—`;
+        });
+        txt += `${p.name}: ${cells.join("  ")}\n`;
+      });
+
+      txt += `\n— EDIÇÃO —\n`;
+      cfg.editTeam.filter((p) => p.active).forEach((p) => {
+        const cells = EDIT_WORK.map((c) => {
+          const arr = week.edit[p.name]?.[c.key] || [];
+          return arr.length
+            ? `${c.label}:${arr.map((a) => a.offer + (a.slot ? ` ${a.slot}` : "")).join(" + ")}`
+            : `${c.label}:—`;
+        });
+        txt += `${p.name}${p.backup ? " (tapa-buraco)" : ""}: ${cells.join("  ")}\n`;
+      });
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(
+          () => toast("Print copiado! Cole no WhatsApp do Matheus.", "ok"),
+          () => {}
+        );
+      }
+      showExportFallback(txt);
+    }
+    /* Print da aba Tráfego — o que sobe no sábado, pro Matheus */
+    function exportTraffic() {
+      const week = ensureWeek(STATE, STATE.current);
+      const cfg = STATE.config;
+      const sat = fmtBR(uploadSaturdayISO(week.num));
+
+      const goesUp = [], stays = [];
+      Object.entries(week.edit || {}).forEach(([editor, row]) =>
+        Object.values(row).forEach((arr) =>
+          (arr || []).forEach((c) =>
+            (c.gordura ? stays : goesUp).push({ name: c.id, offer: c.offer, by: c.by, editor })
+          )
+        )
+      );
+      const prev = STATE.weeks[week.num - 1];
+      const carryIn = [];
+      if (prev && prev.carryOut)
+        prev.carryOut.forEach((c) =>
+          carryIn.push({ name: c.id, offer: c.offer, by: c.by, editor: editorOfUid(prev, c.uid) || "—", received: true })
+        );
+      const all = goesUp.concat(carryIn);
+      const sig = (n) => { const p = cfg.copyTeam.find((x) => x.name === n); return p ? p.sigla : (n || "?"); };
+
+      let txt = `🚀 SOBE NO SÁBADO ${sat} · ${all.length} criativos\n`;
+      const byOffer = {};
+      all.forEach((it) => (byOffer[it.offer] = byOffer[it.offer] || []).push(it));
+      cfg.offers.map((o) => o.code).filter((c) => byOffer[c]).forEach((code) => {
+        txt += `\n— ${code} (${byOffer[code].length}) —\n`;
+        byOffer[code].forEach((it) => {
+          txt += `${it.name}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}${it.received ? "  (gordura recebida)" : ""}\n`;
+        });
+      });
+      if (stays.length) {
+        txt += `\n⏭ FICA PRA PRÓXIMA (${fmtBR(uploadSaturdayISO(week.num + 1))}):\n`;
+        stays.forEach((it) => (txt += `${it.name}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}\n`));
+      }
+
+      if (navigator.clipboard)
+        navigator.clipboard.writeText(txt).then(() => toast("Lista de tráfego copiada!", "ok"), () => {});
+      showExportFallback(txt);
+    }
+
+    function showExportFallback(txt) {
+      const old = document.getElementById("exportPre");
+      if (old) old.remove();
+      const box = document.createElement("div");
+      box.className = "modal";
+      box.id = "exportPre";
+      box.innerHTML = `<div class="modal-box" style="max-width:640px">
+        <div class="modal-head"><h2>Print da semana</h2><button class="icon-btn" id="closeExp">✕</button></div>
+        <div class="modal-body"><textarea style="width:100%;height:320px;font-family:monospace;font-size:12px">${txt.replace(/</g, "&lt;")}</textarea></div>
+        <div class="modal-foot"><span class="muted">Selecione tudo e copie (Ctrl/Cmd+C).</span><button class="btn primary" id="copyExp">Copiar</button></div>
+      </div>`;
+      document.body.appendChild(box);
+      document.getElementById("closeExp").onclick = () => box.remove();
+      document.getElementById("copyExp").onclick = () => {
+        const ta = box.querySelector("textarea");
+        ta.select();
+        document.execCommand("copy");
+        toast("Copiado!", "ok");
+      };
+    }
+
+    /* ============================================================
+       TOAST
+       ============================================================ */
+    let toastT;
+    function toast(msg, kind = "") {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "toast " + kind;
+      clearTimeout(toastT);
+      toastT = setTimeout(() => t.classList.add("hidden"), 3200);
+    }
+
+    /* ---------- Troca de aba ---------- */
+    let currentView = "plan";
+    function switchView(view) {
+      currentView = view;
+      const isPlan = view === "plan";
+      document.getElementById("metaBar").classList.toggle("hidden", !isPlan);
+      document.getElementById("boards").classList.toggle("hidden", !isPlan);
+      document.getElementById("trafficView").classList.toggle("hidden", isPlan);
+      // botões de ação que só fazem sentido no planejamento
+      document.getElementById("generateBtn").style.display = isPlan ? "" : "none";
+      document.querySelectorAll(".viewtabs .vt").forEach((b) =>
+        b.classList.toggle("active", b.dataset.view === view)
+      );
+      if (!isPlan) renderTraffic(ensureWeek(STATE, STATE.current));
+    }
+
+    /* ============================================================
+       EVENTOS
+       ============================================================ */
+    function bind() {
+      document.getElementById("lockWeek").onclick = () => {
+        const week = ensureWeek(STATE, STATE.current);
+        if (week.locked) {
+          if (!confirm("Destravar esta semana? Ela deixa de ser protegida e pode ser regerada por cima.")) return;
+          week.locked = false;
+          toast("Semana destravada.", "warn");
+        } else {
+          week.locked = true;
+          toast("Semana travada — é o registro real, não será regerada.", "ok");
+        }
+        save();
+        render();
+      };
+
+      document.getElementById("generateBtn").onclick = () => {
+        if (STATE.current === 0) {
+          toast("A Semana 0 é o registro da Semana 6 do doc — não dá pra regerar.", "warn");
+          return;
+        }
+        const week = ensureWeek(STATE, STATE.current);
+        if (week.locked) {
+          toast("Semana TRAVADA (registro real). Destrave antes se quiser mesmo regerar.", "err");
+          return;
+        }
+        const t = metaTarget();
+        const sum = Object.values(week.meta).reduce((a, b) => a + (+b || 0), 0);
+        if (sum === 0) {
+          toast("Digite a quantidade de cada oferta na barra de cima primeiro.", "warn");
+          return;
+        }
+        if (sum !== t) toast(`Atenção: total ${sum}, capacidade é ${t}. Gerando mesmo assim.`, "warn");
+        generateWeek(STATE.current);
+      };
+      document.getElementById("exportBtn").onclick = () =>
+        currentView === "traffic" ? exportTraffic() : exportPrint();
+      document.getElementById("configBtn").onclick = openConfig;
+      document.getElementById("closeConfig").onclick = closeConfig;
+
+      // troca de aba Planejamento / Tráfego
+      document.querySelectorAll(".viewtabs .vt").forEach((b) =>
+        (b.onclick = () => switchView(b.dataset.view))
+      );
+
+      document.getElementById("prevWeek").onclick = () => {
+        if (STATE.current > 0) { STATE.current--; render(); }
+      };
+      document.getElementById("nextWeek").onclick = () => {
+        STATE.current++;
+        ensureWeek(STATE, STATE.current);
+        render();
+      };
+
+      document.getElementById("addOffer").onclick = () => {
+        const palette = ["#35c98a", "#ffab5c", "#ff5c6a", "#47a6ff", "#b98cff", "#ffcf5c", "#5cffd6"];
+        STATE.config.offers.push({
+          code: "NOVA",
+          color: palette[STATE.config.offers.length % palette.length],
+          active: true,
+        });
+        renderOffersList();
+      };
+      document.getElementById("addCopy").onclick = () => {
+        const copyPal = ["#4d9bff", "#b96bff", "#ff6bb3", "#5cffd6", "#ffd166", "#8aff5c"];
+        STATE.config.copyTeam.push({
+          name: "Nome",
+          sigla: "",
+          color: copyPal[STATE.config.copyTeam.length % copyPal.length],
+          active: true,
+        });
+        renderTeamList("copy");
+      };
+      document.getElementById("addEditor").onclick = () => {
+        STATE.config.editTeam.push({ name: "Nome", active: true, backup: false });
+        renderTeamList("edit");
+      };
+      document.getElementById("levasPerCopy").oninput = (e) => {
+        STATE.config.levasPerCopy = +e.target.value || 1;
+      };
+
+      document.getElementById("adsPorLeva").oninput = (e) => {
+        STATE.config.adsPorLeva = +e.target.value || 5;
+      };
+
+      document.getElementById("saveConfig").onclick = () => {
+        STATE.config.nomenclature =
+          document.getElementById("nomenclature").value || "AD_{COPY}-{OFERTA}{ini}-{fim}";
+        STATE.config.weekStart = document.getElementById("weekStart").value || nextThursdayISO();
+        save(); closeConfig(); render();
+        toast("Config salva.", "ok");
+      };
+      // ---- Backup: baixar / restaurar (funciona em file:// também)
+      document.getElementById("exportData").onclick = () => {
+        const dump = JSON.stringify(STATE, null, 2);
+        const blob = new Blob([dump], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `task-diarias-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        toast("Backup baixado.", "ok");
+      };
+      document.getElementById("importData").onchange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const fr = new FileReader();
+        fr.onload = () => {
+          try {
+            const data = JSON.parse(fr.result);
+            if (!data || !data.config || !data.weeks) throw new Error("formato inválido");
+            if (!confirm("Restaurar este backup? Os dados atuais deste navegador serão substituídos.")) return;
+            STATE = data;
+            migrate(STATE);
+            save();
+            closeConfig();
+            render();
+            toast("Backup restaurado.", "ok");
+          } catch (err) {
+            toast("Arquivo inválido — não parece um backup do Task Diárias.", "err");
+          }
+          e.target.value = "";
+        };
+        fr.readAsText(file);
+      };
+
+      document.getElementById("resetData").onclick = () => {
+        if (confirm("Resetar tudo (ofertas, times, semanas)? Não dá pra desfazer.")) {
+          localStorage.removeItem(STORE_KEY);
+          STATE = load();
+          closeConfig(); render();
+          toast("Resetado.", "ok");
+        }
+      };
+
+      document.getElementById("configModal").addEventListener("click", (e) => {
+        if (e.target.id === "configModal") closeConfig();
+      });
+    }
+
+    /* ---------- Boot ---------- */
+    ensureWeek(STATE, STATE.current);
+    bind();
+    render();
+  </script>
+</body>
+</html>
