@@ -260,48 +260,78 @@
     .viewtabs .vt.active { background: var(--accent-2); color: #fff; }
 
     /* ===== Traffic view ===== */
-    .traffic { padding: 18px 22px 8px; }
+    .traffic { padding: 20px 22px 8px; }
     .traffic.hidden { display: none; }
     .traffic-top {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
-      padding: 16px 20px; margin-bottom: 16px; flex-wrap: wrap;
+      display: grid; grid-template-columns: 1fr auto auto; gap: 20px; align-items: center;
+      background: linear-gradient(135deg, rgba(71,166,255,.08), var(--bg-2));
+      border: 1px solid var(--line); border-radius: 14px;
+      padding: 18px 22px; margin-bottom: 18px;
     }
-    .traffic-top h2 { margin: 0; font-size: 18px; }
-    .traffic-top h2 span { color: var(--blue); }
+    .traffic-title h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: .3px; }
+    .traffic-title h2 span { color: var(--blue); font-weight: 800; }
+    .traffic-title p { margin: 0; font-size: 13px; }
     .traffic-total {
-      text-align: center; background: var(--bg-3); border: 1px solid var(--blue);
-      border-radius: 12px; padding: 8px 18px;
+      text-align: center; background: rgba(71,166,255,.12); border: 1.5px solid var(--blue);
+      border-radius: 14px; padding: 10px 22px;
     }
-    .traffic-total b { font-size: 26px; display: block; color: var(--blue); }
-    .traffic-total small { color: var(--muted); font-size: 11px; }
-    .traffic-offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-    .toff { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .traffic-total b { font-size: 32px; display: block; color: var(--blue); line-height: 1; font-weight: 800; }
+    .traffic-total small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    .traffic-actions { display: flex; gap: 6px; flex-direction: column; }
+    .traffic-actions .btn { white-space: nowrap; }
+
+    .traffic-offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .toff {
+      background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
     .toff-head {
-      display: flex; align-items: center; gap: 10px; padding: 11px 14px;
-      border-bottom: 1px solid var(--line); background: var(--panel);
+      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
     }
-    .toff-head .oc { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #0d0f14; }
-    .toff-head b { font-size: 14px; }
-    .toff-head .cnt { margin-left: auto; font-size: 20px; font-weight: 800; }
+    .toff-head .oc {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      font-size: 12px; font-weight: 800; color: #0d0f14;
+    }
+    .toff-head b { font-size: 15px; letter-spacing: .3px; }
+    .toff-head .cnt {
+      margin-left: auto; font-size: 22px; font-weight: 800;
+      min-width: 36px; text-align: center;
+    }
     .toff-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
     .trow {
-      display: flex; align-items: center; gap: 8px; padding: 7px 9px;
-      background: var(--bg-3); border-radius: 8px; border-left: 5px solid var(--line); font-size: 12px;
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+      padding: 9px 12px; background: var(--bg-3); border-radius: 8px;
+      border-left: 4px solid var(--line); font-size: 13px;
     }
-    .trow .tname { font-weight: 700; }
-    .trow .tmeta { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
-    .trow .who { display: inline-flex; align-items: center; gap: 4px; }
-    .trow .who i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .trow .gb { background: var(--yellow); color: #0d0f14; font-weight: 700; border-radius: 4px; padding: 0 5px; font-size: 10px; }
-    .traffic-empty { color: var(--muted); padding: 30px; text-align: center; }
+    .trow .tname { font-weight: 700; font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: -.3px; }
+    .trow .tmeta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+    .trow .who { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--text); }
+    .trow .who i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .trow .ed { display: inline-flex; align-items: center; gap: 4px; }
+    .trow .gb {
+      background: var(--yellow); color: #0d0f14; font-weight: 700;
+      border-radius: 4px; padding: 1px 6px; font-size: 10px; letter-spacing: .3px;
+    }
+    .traffic-empty { color: var(--muted); padding: 40px; text-align: center; font-size: 14px; }
+
     .gordura-box {
-      margin-top: 16px; background: var(--bg-2); border: 1px dashed var(--yellow);
-      border-radius: var(--radius); padding: 14px 16px;
+      margin-top: 18px; background: linear-gradient(135deg, rgba(255,207,92,.06), var(--bg-2));
+      border: 1px dashed var(--yellow); border-radius: 12px; padding: 16px 18px;
     }
-    .gordura-box h3 { margin: 0 0 4px; font-size: 13px; color: var(--yellow); }
-    .gordura-box .sub { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
-    .gordura-box .grow { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-3); border-radius: 8px; padding: 5px 9px; font-size: 12px; margin: 0 6px 6px 0; border-left: 5px solid var(--yellow); }
+    .gordura-box h3 { margin: 0 0 4px; font-size: 14px; color: var(--yellow); }
+    .gordura-box .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+    .gordura-box .grow {
+      display: inline-flex; align-items: center; gap: 8px; background: var(--bg-3);
+      border-radius: 8px; padding: 7px 11px; font-size: 12px; margin: 0 8px 8px 0;
+      border-left: 4px solid var(--yellow);
+    }
+    .gordura-box .grow b { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+    @media (max-width: 720px) {
+      .traffic-top { grid-template-columns: 1fr; }
+      .traffic-actions { flex-direction: row; }
+    }
 
     @media (max-width: 720px) {
       .config-cols { grid-template-columns: 1fr; }
@@ -369,11 +399,15 @@
   <!-- ===== Aba TRÁFEGO ===== -->
   <section id="trafficView" class="traffic hidden">
     <div class="traffic-top">
-      <div>
-        <h2>Sobe no sábado <span id="satDate">—</span></h2>
-        <p class="muted" id="satSub">A leva inteira da semana sobe de uma vez no sábado.</p>
+      <div class="traffic-title">
+        <h2>🚀 Sobe na sexta <span id="satDate">—</span></h2>
+        <p class="muted" id="satSub">A leva inteira da semana sobe de uma vez na sexta.</p>
       </div>
       <div class="traffic-total" id="trafficTotal"></div>
+      <div class="traffic-actions">
+        <button id="trafficCopyBtn" class="btn small">📋 Copiar texto</button>
+        <button id="trafficImgBtn" class="btn small">📷 Baixar imagem</button>
+      </div>
     </div>
     <div id="trafficOffers" class="traffic-offers"></div>
     <div id="trafficGordura"></div>
@@ -1051,10 +1085,12 @@
          + gordura recebida da semana anterior (finalizou na segunda)
          − a gordura desta semana (leva 2 da quinta) → vai pro próximo sábado
        O total por oferta bate com o "sobe X" do contador. */
-    function uploadSaturdayISO(num) {
-      // quinta da semana + 9 dias = sábado após o fim da edição (QUI+2)
-      return addDaysISO(weekStartISO(num), 9);
+    function uploadDayISO(num) {
+      // quinta da semana + 8 dias = sexta após o fim da edição (QUI+1)
+      return addDaysISO(weekStartISO(num), 8);
     }
+    // alias antigo mantido pra compatibilidade
+    const uploadSaturdayISO = uploadDayISO;
     function editorOfUid(week, wantUid) {
       if (!week || !week.edit) return null;
       for (const [person, row] of Object.entries(week.edit)) {
@@ -1111,7 +1147,7 @@
         totalEl.innerHTML = "";
         return;
       }
-      sub.textContent = `Leva da ${week.num === 0 ? "Semana 0 (doc S6)" : "Semana " + week.num} — sobe tudo de uma vez.`;
+      sub.textContent = `Leva da ${week.num === 0 ? "Semana 0 (doc S6)" : "Semana " + week.num} — sobe tudo de uma vez na sexta.`;
       totalEl.innerHTML = `<b>${all.length}</b><small>criativos sobem</small>`;
 
       // 3) agrupa por oferta (ordem das ofertas do config)
@@ -1137,11 +1173,12 @@
             .map(
               (it) => `
             <div class="trow" style="border-left-color:${dotOf(it.by)}">
-              <span class="tname">${it.name}</span>
-              ${it.received ? '<span class="gb">recebida</span>' : ""}
+              <span class="tname">${it.name || `${siglaOf(it.by) || "?"}-${it.offer}`}${
+                it.received ? ' <span class="gb">recebida</span>' : ""
+              }</span>
               <span class="tmeta">
-                <span class="who"><i style="background:${dotOf(it.by)}"></i>${siglaOf(it.by) || it.by || "?"}</span>
-                <span title="editor">✎ ${it.editor}</span>
+                <span class="who" title="Copy"><i style="background:${dotOf(it.by)}"></i>${siglaOf(it.by) || it.by || "?"}</span>
+                <span class="ed" title="Editor">✎ ${it.editor}</span>
               </span>
             </div>`
             )
@@ -1159,20 +1196,293 @@
 
       // 4) caixa da gordura (fica pra próxima)
       if (stays.length) {
-        const nextSat = fmtBR(uploadSaturdayISO(week.num + 1));
+        const nextFri = fmtBR(uploadDayISO(week.num + 1));
         gordBox.innerHTML = `
           <div class="gordura-box">
-            <h3>⏭ Fica pra próxima semana (gordura) — sobe no sábado ${nextSat}</h3>
-            <p class="sub">Leva 2 da quinta: só finaliza na segunda, não dá tempo pra este sábado.</p>
+            <h3>⏭ Fica pra próxima semana (gordura) — sobe na sexta ${nextFri}</h3>
+            <p class="sub">Leva 2 da quinta: só finaliza na segunda, não dá tempo pra esta sexta.</p>
             ${stays
               .map(
-                (it) => `<span class="grow"><b>${it.name}</b> · ${siglaOf(it.by) || it.by || "?"} · ✎ ${it.editor}</span>`
+                (it) => `<span class="grow"><b>${it.name || `${siglaOf(it.by) || "?"}-${it.offer}`}</b> · ${siglaOf(it.by) || it.by || "?"} · ✎ ${it.editor}</span>`
               )
               .join("")}
           </div>`;
       } else {
         gordBox.innerHTML = "";
       }
+    }
+
+    /* ============================================================
+       Aba Tráfego — botões: copiar texto (WhatsApp) e baixar imagem (PNG)
+       ============================================================ */
+    function trafficBuildData(week) {
+      const cfg = STATE.config;
+      const siglaOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).sigla || "";
+      const goesUp = [], stays = [];
+      Object.entries(week.edit || {}).forEach(([editor, row]) =>
+        Object.values(row).forEach((arr) =>
+          (arr || []).forEach((c) =>
+            (c.gordura ? stays : goesUp).push({
+              name: c.id || `AD_${siglaOf(c.by)}-${c.offer}`,
+              offer: c.offer, by: c.by, editor,
+            })
+          )
+        )
+      );
+      const carryIn = [];
+      const prev = STATE.weeks[week.num - 1];
+      if (prev && prev.carryOut)
+        prev.carryOut.forEach((c) =>
+          carryIn.push({
+            name: c.id || `AD_${siglaOf(c.by)}-${c.offer}`,
+            offer: c.offer, by: c.by,
+            editor: editorOfUid(prev, c.uid) || "—",
+            received: true,
+          })
+        );
+      const all = goesUp.concat(carryIn);
+      const byOffer = {};
+      all.forEach((it) => (byOffer[it.offer] = byOffer[it.offer] || []).push(it));
+      const order = cfg.offers.map((o) => o.code).filter((c) => byOffer[c]);
+      Object.keys(byOffer).forEach((c) => { if (!order.includes(c)) order.push(c); });
+      return { all, byOffer, order, stays };
+    }
+
+    function trafficAsText(week) {
+      const cfg = STATE.config;
+      const siglaOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).sigla || "";
+      const ws = weekStartISO(week.num);
+      const fri = fmtBR(uploadDayISO(week.num));
+      const { byOffer, order, stays } = trafficBuildData(week);
+      const total = order.reduce((s, c) => s + byOffer[c].length, 0);
+
+      let out = `🚀 *SOBE NA SEXTA ${fri}*\n`;
+      out += `_Semana ${week.num} · ${fmtBR(ws)}–${fmtBR(addDaysISO(ws, 6))} · ${total} criativo${total === 1 ? "" : "s"}_\n`;
+
+      order.forEach((code) => {
+        const list = byOffer[code];
+        out += `\n*${code} (${list.length})*\n`;
+        list.forEach((it) => {
+          const rec = it.received ? " _(gordura recebida)_" : "";
+          out += `• ${it.name} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}${rec}\n`;
+        });
+      });
+
+      if (stays.length) {
+        const nextFri = fmtBR(uploadDayISO(week.num + 1));
+        out += `\n⏭ *FICA PRA PRÓXIMA SEXTA (${nextFri}):*\n`;
+        stays.forEach((it) => {
+          out += `• ${it.name} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}\n`;
+        });
+      }
+      return out.trim();
+    }
+
+    // Desenha a aba tráfego num canvas e faz download como PNG.
+    // Sem dependências externas: Canvas 2D nativo.
+    function trafficAsImage(week) {
+      const cfg = STATE.config;
+      const siglaOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).sigla || "";
+      const colorOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).color || "#8a91a3";
+      const { byOffer, order, stays, all } = trafficBuildData(week);
+      const fri = fmtBR(uploadDayISO(week.num));
+
+      // layout: 2 colunas de cards, altura calculada
+      const W = 880, PAD = 28, GAP = 14, COL = 2;
+      const CARD_W = (W - PAD * 2 - GAP * (COL - 1)) / COL;
+      const HEADER_H = 110;
+      const ROW_H = 34;
+      const CARD_HEAD_H = 52;
+      const CARD_PAD = 10;
+      const cardHeight = (n) => CARD_HEAD_H + CARD_PAD * 2 + n * ROW_H + (n - 1) * 4;
+
+      // altura total: header + N linhas de cards (2 por linha)
+      const rows = Math.ceil(order.length / COL);
+      let bodyH = 0;
+      for (let r = 0; r < rows; r++) {
+        let maxH = 0;
+        for (let c = 0; c < COL; c++) {
+          const code = order[r * COL + c];
+          if (code) maxH = Math.max(maxH, cardHeight(byOffer[code].length));
+        }
+        bodyH += maxH + GAP;
+      }
+      const gordH = stays.length ? 70 + Math.ceil(stays.length / 2) * 32 : 0;
+      const H = HEADER_H + bodyH + gordH + PAD;
+
+      const dpr = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+
+      // fundo
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      grad.addColorStop(0, "#0f1117");
+      grad.addColorStop(1, "#161923");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // header
+      ctx.fillStyle = "#e6e9ef";
+      ctx.font = "800 26px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(`🚀 Sobe na sexta`, PAD, PAD + 26);
+      ctx.fillStyle = "#47a6ff";
+      ctx.font = "800 26px -apple-system, BlinkMacSystemFont, sans-serif";
+      const p1w = ctx.measureText("🚀 Sobe na sexta ").width;
+      ctx.fillText(fri, PAD + p1w, PAD + 26);
+      ctx.fillStyle = "#8a91a3";
+      ctx.font = "13px -apple-system, BlinkMacSystemFont, sans-serif";
+      const ws = weekStartISO(week.num);
+      ctx.fillText(
+        `Semana ${week.num} · ${fmtBR(ws)}–${fmtBR(addDaysISO(ws, 6))}`,
+        PAD,
+        PAD + 48
+      );
+      // caixa total
+      const tW = 130, tH = 62;
+      ctx.fillStyle = "rgba(71,166,255,.15)";
+      roundRect(ctx, W - PAD - tW, PAD, tW, tH, 12);
+      ctx.fill();
+      ctx.strokeStyle = "#47a6ff";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, W - PAD - tW, PAD, tW, tH, 12);
+      ctx.stroke();
+      ctx.fillStyle = "#47a6ff";
+      ctx.font = "800 30px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(String(all.length), W - PAD - tW / 2, PAD + 36);
+      ctx.fillStyle = "#8a91a3";
+      ctx.font = "10px -apple-system, sans-serif";
+      ctx.fillText("SOBEM NA SEXTA", W - PAD - tW / 2, PAD + 54);
+      ctx.textAlign = "left";
+
+      // cards por oferta
+      let y = HEADER_H;
+      for (let r = 0; r < rows; r++) {
+        let maxH = 0;
+        for (let c = 0; c < COL; c++) {
+          const code = order[r * COL + c];
+          if (!code) continue;
+          const x = PAD + c * (CARD_W + GAP);
+          const list = byOffer[code];
+          const cH = cardHeight(list.length);
+          maxH = Math.max(maxH, cH);
+
+          // card
+          ctx.fillStyle = "#191d28";
+          roundRect(ctx, x, y, CARD_W, cH, 12); ctx.fill();
+          ctx.strokeStyle = "#2a2f3d"; ctx.lineWidth = 1;
+          roundRect(ctx, x, y, CARD_W, cH, 12); ctx.stroke();
+
+          // header do card
+          const oCol = offerColor(cfg, code);
+          ctx.fillStyle = oCol;
+          roundRect(ctx, x + 14, y + 12, 34, 34, 8); ctx.fill();
+          ctx.fillStyle = "#0d0f14";
+          ctx.font = "800 12px -apple-system, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(code.slice(0, 2), x + 14 + 17, y + 12 + 22);
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#e6e9ef";
+          ctx.font = "700 15px -apple-system, sans-serif";
+          ctx.fillText(code, x + 58, y + 34);
+          ctx.fillStyle = oCol;
+          ctx.font = "800 22px -apple-system, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(String(list.length), x + CARD_W - 18, y + 36);
+          ctx.textAlign = "left";
+          // divisor
+          ctx.strokeStyle = "#2a2f3d";
+          ctx.beginPath(); ctx.moveTo(x, y + CARD_HEAD_H); ctx.lineTo(x + CARD_W, y + CARD_HEAD_H); ctx.stroke();
+
+          // rows
+          list.forEach((it, i) => {
+            const ry = y + CARD_HEAD_H + CARD_PAD + i * (ROW_H + 4);
+            // fundo da linha
+            ctx.fillStyle = "#1e222e";
+            roundRect(ctx, x + CARD_PAD, ry, CARD_W - CARD_PAD * 2, ROW_H, 6); ctx.fill();
+            // barra colorida (copy)
+            ctx.fillStyle = colorOf(it.by);
+            ctx.fillRect(x + CARD_PAD, ry, 4, ROW_H);
+            // nome
+            ctx.fillStyle = "#e6e9ef";
+            ctx.font = "700 12px ui-monospace, Menlo, monospace";
+            ctx.fillText(it.name, x + CARD_PAD + 12, ry + 20);
+            // meta (direita)
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#8a91a3";
+            ctx.font = "10px -apple-system, sans-serif";
+            const metaRight = x + CARD_W - CARD_PAD - 8;
+            ctx.fillText(
+              `${siglaOf(it.by) || it.by} · ✎ ${it.editor}${it.received ? " · recebida" : ""}`,
+              metaRight, ry + 21
+            );
+            ctx.textAlign = "left";
+          });
+        }
+        y += maxH + GAP;
+      }
+
+      // gordura
+      if (stays.length) {
+        ctx.fillStyle = "rgba(255,207,92,.06)";
+        roundRect(ctx, PAD, y, W - PAD * 2, gordH - 8, 12); ctx.fill();
+        ctx.strokeStyle = "#ffcf5c";
+        ctx.setLineDash([6, 4]);
+        roundRect(ctx, PAD, y, W - PAD * 2, gordH - 8, 12); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#ffcf5c";
+        ctx.font = "700 14px -apple-system, sans-serif";
+        const nextFri = fmtBR(uploadDayISO(week.num + 1));
+        ctx.fillText(`⏭ Fica pra próxima sexta (${nextFri})`, PAD + 14, y + 24);
+        ctx.fillStyle = "#8a91a3";
+        ctx.font = "11px -apple-system, sans-serif";
+        ctx.fillText(`Leva 2 da quinta: finaliza na segunda, não dá tempo pra esta sexta.`, PAD + 14, y + 42);
+        stays.forEach((it, i) => {
+          const col = i % 2;
+          const row = Math.floor(i / 2);
+          const gx = PAD + 14 + col * ((W - PAD * 2 - 28) / 2);
+          const gy = y + 60 + row * 32;
+          ctx.fillStyle = "#1e222e";
+          roundRect(ctx, gx, gy, (W - PAD * 2 - 40) / 2, 24, 6); ctx.fill();
+          ctx.fillStyle = "#ffcf5c";
+          ctx.fillRect(gx, gy, 3, 24);
+          ctx.fillStyle = "#e6e9ef";
+          ctx.font = "700 12px ui-monospace, Menlo, monospace";
+          ctx.fillText(it.name, gx + 10, gy + 16);
+          ctx.fillStyle = "#8a91a3";
+          ctx.font = "10px -apple-system, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(
+            `${siglaOf(it.by) || it.by} · ✎ ${it.editor}`,
+            gx + (W - PAD * 2 - 40) / 2 - 8, gy + 16
+          );
+          ctx.textAlign = "left";
+        });
+      }
+
+      // download
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `sobe-sexta-${fri.replace("/", "-")}-semana-${week.num}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
     }
 
     /* Barra principal: quantidade editável por oferta + contadores */
@@ -1758,6 +2068,31 @@
         currentView === "traffic" ? exportTraffic() : exportPrint();
       document.getElementById("configBtn").onclick = openConfig;
       document.getElementById("closeConfig").onclick = closeConfig;
+
+      // Aba Tráfego: copiar texto formatado / baixar imagem
+      const copyBtn = document.getElementById("trafficCopyBtn");
+      const imgBtn = document.getElementById("trafficImgBtn");
+      if (copyBtn) {
+        copyBtn.onclick = async () => {
+          const txt = trafficAsText(ensureWeek(STATE, STATE.current));
+          try {
+            await navigator.clipboard.writeText(txt);
+            toast("Texto copiado! Cole no WhatsApp do gestor.", "ok");
+          } catch {
+            showExportFallback(txt);
+          }
+        };
+      }
+      if (imgBtn) {
+        imgBtn.onclick = () => {
+          try {
+            trafficAsImage(ensureWeek(STATE, STATE.current));
+            toast("Imagem baixada.", "ok");
+          } catch (e) {
+            toast("Erro ao gerar imagem: " + e.message, "err");
+          }
+        };
+      }
 
       // troca de aba Planejamento / Tráfego
       document.querySelectorAll(".viewtabs .vt").forEach((b) =>
