@@ -938,6 +938,19 @@
       const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
       const lastCol = COPY_WORK[COPY_WORK.length - 1];
 
+      // Reserva JÁ a oferta menos prioritária pro último dia da rotPerson —
+      // se deixasse pro sorteio dia-a-dia, ela podia ser toda consumida
+      // ANTES de chegar a vez da rotPerson (mesmo sobrando capacidade na
+      // semana), e a gordura acabava caindo numa oferta prioritária à toa.
+      // Só reserva se o último dia ainda for LIVRE (se já é congelado/real,
+      // a gordura dessa semana já foi decidida antes — reservar aqui seria
+      // desperdiçar oferta que não vai ser usada em lugar nenhum).
+      let reservedGordura = null;
+      if (rotPerson && pool.length && !isFrozenCopy(lastCol)) {
+        const leastPri = leastPriorityInPool(cfg, pool);
+        if (leastPri) reservedGordura = pool.splice(pool.indexOf(leastPri), 1)[0];
+      }
+
       for (const col of COPY_WORK) {
         const isLastDay = col === lastCol;
         const todays = [];
@@ -956,11 +969,14 @@
           if (reservedCode) {
             // oferta fixa: já reservada pra este dia, não consome o pool
             code = reservedCode;
+          } else if (isLastDay && p === rotPerson && reservedGordura) {
+            // PRIORIDADE: usa a oferta reservada no início — garantida,
+            // não depende do que sobrou no pool até aqui.
+            code = reservedGordura;
           } else if (pool.length === 0) {
             continue; // sem pool hoje pra essa pessoa — mas outros dias/pessoas seguem
           } else if (isLastDay && p === rotPerson) {
-            // PRIORIDADE: no último dia, a rotPerson pega a oferta MENOS
-            // prioritária disponível — ela vira gordura, protegendo as prioritárias.
+            // fallback (não devia sobrar reservedGordura vazio, mas por via das dúvidas)
             const leastPri = leastPriorityInPool(cfg, pool);
             let idx = pool.findIndex((o) => o === leastPri && o !== lastOffer[p]);
             if (idx < 0) idx = pool.indexOf(leastPri);
