@@ -801,60 +801,126 @@
     function generateWeek(num) {
       const cfg = STATE.config;
       const week = ensureWeek(STATE, num);
-
       const copies = cfg.copyTeam.filter((p) => p.active).map((p) => p.name);
+      const siglaOf = {};
+      cfg.copyTeam.forEach((p) => (siglaOf[p.name] = p.sigla || ""));
+      const nomen = makeNomenclator(cfg);
+      const adsPer = +cfg.adsPorLeva || 5;
+      const start = weekStartISO(num);
+      const today = todayISO();
 
-      // ---- Ofertas FIXAS (1 leva garantida por copy/semana) ficam de fora
-      // do sorteio geral: são reservadas direto num dia (não no último dia,
-      // pra nunca disputar com a lógica de gordura/prioridade do rotPerson).
+      // ---- Dias já REAIS (com card e data <= hoje) ficam INTOCADOS — só os
+      // dias futuros são (re)gerados. Isso permite reajustar as metas no meio
+      // da semana sem apagar o que já foi de fato escrito/editado.
+      const hasExistingCopy = copies.some(
+        (p) => week.copy[p] && Object.values(week.copy[p]).some(Boolean)
+      );
+      const frozenCopyCols = new Set();
+      if (hasExistingCopy) {
+        COPY_WORK.forEach((col) => {
+          if (addDaysISO(start, col.off) <= today) frozenCopyCols.add(col.key);
+        });
+      }
+      const isFrozenCopy = (col) => frozenCopyCols.has(col.key);
+
+      const hasExistingEdit = Object.values(week.edit || {}).some((row) =>
+        Object.values(row || {}).some((arr) => (arr || []).length)
+      );
+      const frozenEditCols = new Set();
+      if (hasExistingEdit) {
+        EDIT_WORK.forEach((col) => {
+          if (addDaysISO(start, col.off) <= today) frozenEditCols.add(col.key);
+        });
+      }
+      const isFrozenEdit = (col) => frozenEditCols.has(col.key);
+
+      // ---- Ofertas FIXAS (1 leva garantida por copy/semana). Quem já tem
+      // essa oferta num dia CONGELADO não ganha outra; os demais são
+      // reservados num dia LIVRE (nunca no último dia, por causa da gordura).
       const fixedOffs = activeOffers(cfg).filter((o) => o.fixedPerCopy);
       const nonLastDays = COPY_WORK.slice(0, -1);
-      const reserved = {}; // reserved[pessoa][diaKey] = offerCode
+      const fixedAlready = {};
+      copies.forEach((p) => (fixedAlready[p] = {}));
+      COPY_WORK.forEach((col) => {
+        if (!isFrozenCopy(col)) return;
+        copies.forEach((p) => {
+          const c = week.copy[p] && week.copy[p][col.key];
+          if (c && fixedOffs.some((o) => o.code === c.offer)) fixedAlready[p][c.offer] = true;
+        });
+      });
+      const reserved = {}; // reserved[pessoa][diaKey] = offerCode (só em dias livres)
       copies.forEach((p) => (reserved[p] = {}));
       fixedOffs.forEach((o) => {
-        week.meta[o.code] = copies.length; // sempre 1 por copy ativo
+        week.meta[o.code] = copies.length; // sempre 1 por copy ativo, a semana toda
         copies.forEach((p) => {
-          const avail = nonLastDays.filter((c) => !reserved[p][c.key]);
-          const day = avail[Math.floor(Math.random() * avail.length)] || nonLastDays[0];
+          if (fixedAlready[p][o.code]) return; // já tem essa semana (dia congelado)
+          const freeNonLast = nonLastDays.filter((c) => !isFrozenCopy(c) && !reserved[p][c.key]);
+          const freeAny = COPY_WORK.filter((c) => !isFrozenCopy(c) && !reserved[p][c.key]);
+          const avail = freeNonLast.length ? freeNonLast : freeAny;
+          if (!avail.length) return; // não sobrou dia livre pra reservar (raríssimo)
+          const day = avail[Math.floor(Math.random() * avail.length)];
           reserved[p][day.key] = o.code;
         });
       });
 
-      // ---- pool de levas a partir das quantidades (exclui ofertas fixas)
+      // ---- quanto já foi consumido nos dias congelados (por oferta) — o
+      // sorteio usa só o que falta, pra a meta continuar batendo certinho.
+      const usedByOffer = {};
+      COPY_WORK.forEach((col) => {
+        if (!isFrozenCopy(col)) return;
+        copies.forEach((p) => {
+          const c = week.copy[p] && week.copy[p][col.key];
+          if (c) usedByOffer[c.offer] = (usedByOffer[c.offer] || 0) + 1;
+        });
+      });
+
+      // ---- pool de levas a partir das quantidades restantes (exclui fixas)
       let pool = [];
       Object.entries(week.meta).forEach(([code, q]) => {
         const def = cfg.offers.find((o) => o.code === code);
         if (def && def.fixedPerCopy) return;
-        for (let i = 0; i < q; i++) pool.push(code);
+        const remain = Math.max(0, (+q || 0) - (usedByOffer[code] || 0));
+        for (let i = 0; i < remain; i++) pool.push(code);
       });
       shuffle(pool);
 
-      const siglaOf = {};
-      cfg.copyTeam.forEach((p) => (siglaOf[p.name] = p.sigla || ""));
-      const nomen = makeNomenclator(cfg);
-
-      // contador de nº de ad por copy+oferta (continua de onde parou)
-      const adsPer = +cfg.adsPorLeva || 5;
+      // contador de nº de ad por copy+oferta — parte de onde parou (semanas
+      // anteriores) e também considera os cards já congelados desta semana.
       const adCounter = {};
       function takeRange(copyName, offer) {
         if (!adCounter[copyName]) adCounter[copyName] = {};
-        if (adCounter[copyName][offer] == null)
-          adCounter[copyName][offer] = lastAdUsed(cfg, copyName, offer, num);
+        if (adCounter[copyName][offer] == null) {
+          let base = lastAdUsed(cfg, copyName, offer, num);
+          Object.values(week.copy[copyName] || {}).forEach((c) => {
+            if (c && c.offer === offer && typeof c.n2 === "number") base = Math.max(base, c.n2);
+          });
+          adCounter[copyName][offer] = base;
+        }
         const n1 = adCounter[copyName][offer] + 1;
         const n2 = n1 + adsPer - 1;
         adCounter[copyName][offer] = n2;
         return [n1, n2];
       }
 
-      // ---- COPY: dia a dia, misturando ofertas no dia e sem repetir por pessoa
+      // ---- COPY: mantém os dias congelados como estão; regenera só os livres
       const copy = {};
-      copies.forEach((p) => (copy[p] = {}));
-      // anti-repetição contínua entre semanas: o 1º dia desta semana evita
-      // a oferta que cada copy escreveu no ÚLTIMO dia da semana anterior
+      copies.forEach((p) => (copy[p] = { ...(week.copy[p] || {}) }));
+
+      // anti-repetição: parte do último dia CONGELADO desta semana; se ainda
+      // não tiver nenhum, cai pro último dia da semana ANTERIOR (como antes)
       const lastOffer = {};
+      copies.forEach((p) => {
+        for (let i = COPY_WORK.length - 1; i >= 0; i--) {
+          const col = COPY_WORK[i];
+          if (!isFrozenCopy(col)) continue;
+          const c = copy[p][col.key];
+          if (c) { lastOffer[p] = c.offer; break; }
+        }
+      });
       const prevW = STATE.weeks[num - 1];
       if (prevW && prevW.copy) {
         copies.forEach((p) => {
+          if (lastOffer[p]) return;
           const row = prevW.copy[p];
           if (!row) return;
           for (let i = COPY_WORK.length - 1; i >= 0; i--) {
@@ -863,16 +929,26 @@
           }
         });
       }
+
       const flat = [];
+      Object.values(copy).forEach((row) => Object.values(row).forEach((c) => c && flat.push(c)));
+      const keptCount = flat.length; // quantos já eram reais (congelados)
       const perDay = []; // levas por dia de escrita (alinha com o dia de edição)
 
-      // rodízio de quem fica com a leva que atrasa (justiça entre os copys)
       const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
       const lastCol = COPY_WORK[COPY_WORK.length - 1];
 
       for (const col of COPY_WORK) {
         const isLastDay = col === lastCol;
         const todays = [];
+
+        if (isFrozenCopy(col)) {
+          // dia já real: preserva tal como está, só alimenta o perDay
+          copies.forEach((p) => { if (copy[p][col.key]) todays.push(copy[p][col.key]); });
+          perDay.push(todays);
+          continue;
+        }
+
         const usedToday = []; // mistura o dia: evita todo mundo na mesma oferta
         for (const p of copies) {
           let code;
@@ -907,11 +983,41 @@
         perDay.push(todays);
       }
 
-      // ---- EDIÇÃO: deriva do copy dia a dia (defasagem de 1 dia útil)
-      // a leva dupla intercala TAMBÉM entre semanas: quem dobrou no último
-      // dia da semana anterior NÃO dobra no primeiro dia desta
-      const lastDupla = findLastDupla(STATE.weeks[num - 1]);
-      const edit = buildEdit(cfg, perDay, rotPerson, lastDupla, lastOffersFromPrevEdit(STATE.weeks[num - 1]));
+      // ---- EDIÇÃO: mantém os dias congelados; regenera só os livres,
+      // continuando o rodízio (dupla + anti-repetição) de onde os dias
+      // congelados desta semana pararam (ou da semana anterior, se não
+      // houver nenhum dia congelado ainda).
+      let seedDupla = null;
+      let seedLastOffer = {};
+      if (hasExistingEdit) {
+        const frozenPseudoWeek = { edit: {} };
+        Object.entries(week.edit || {}).forEach(([person, row]) => {
+          frozenPseudoWeek.edit[person] = {};
+          EDIT_WORK.forEach((col) => {
+            frozenPseudoWeek.edit[person][col.key] = isFrozenEdit(col) ? row[col.key] || [] : [];
+          });
+        });
+        seedDupla = findLastDupla(frozenPseudoWeek);
+        seedLastOffer = lastOffersFromPrevEdit(frozenPseudoWeek);
+      }
+      if (!seedDupla) seedDupla = findLastDupla(STATE.weeks[num - 1]);
+      if (Object.keys(seedLastOffer).length === 0)
+        seedLastOffer = lastOffersFromPrevEdit(STATE.weeks[num - 1]);
+
+      const freshEdit = buildEdit(cfg, perDay, rotPerson, seedDupla, seedLastOffer);
+
+      // mescla: dias congelados ficam como já estavam; dias livres usam o
+      // resultado fresco.
+      const edit = {};
+      const editorNames = new Set([...Object.keys(week.edit || {}), ...Object.keys(freshEdit)]);
+      editorNames.forEach((person) => {
+        edit[person] = {};
+        EDIT_WORK.forEach((col) => {
+          edit[person][col.key] = isFrozenEdit(col)
+            ? (week.edit[person] && week.edit[person][col.key]) || []
+            : (freshEdit[person] && freshEdit[person][col.key]) || [];
+        });
+      });
 
       // ---- GORDURA: a leva 2 (secundária) leva 2 dias — pega num dia, entrega
       // no outro. A leva 2 do ÚLTIMO dia de edição (quinta) só entrega depois
@@ -938,7 +1044,13 @@
       week.edit = edit;
       save();
       render();
-      toast(`Semana ${num} gerada · ${flat.length} levas distribuídas`, "ok");
+      const newCount = flat.length - keptCount;
+      toast(
+        keptCount > 0
+          ? `Semana ${num}: ${keptCount} já feitos mantidos + ${newCount} levas novas distribuídas`
+          : `Semana ${num} gerada · ${flat.length} levas distribuídas`,
+        "ok"
+      );
     }
 
     /* Distribui a edição — regra do "dia sim, dia não".
