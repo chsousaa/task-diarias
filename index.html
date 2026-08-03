@@ -407,6 +407,9 @@
       <div class="traffic-title">
         <h2>🚀 Sobe na sexta <span id="satDate">—</span></h2>
         <p class="muted" id="satSub">A leva inteira da semana sobe de uma vez na sexta.</p>
+        <label class="tgl" style="margin-top:6px;font-size:11px;color:var(--muted)" title="Deixe desligado se a numeração dos ads não estiver 100% conferida com o ClickUp — evita subir o número errado.">
+          <input type="checkbox" id="trafficShowNum" /> mostrar numeração dos ads
+        </label>
       </div>
       <div class="traffic-total" id="trafficTotal"></div>
       <div class="traffic-actions">
@@ -1449,6 +1452,14 @@
         const p = cfg.copyTeam.find((x) => x.name === name);
         return p ? p.sigla : "";
       };
+      // Numeração só aparece se o checkbox estiver ligado — por padrão fica
+      // OFF, porque um ajuste manual de oferta sem recalcular o range pode
+      // deixar o número desatualizado (risco de subir o ad errado).
+      const showNum = !!STATE.trafficShowNumbers;
+      const dispName = (it) =>
+        showNum && it.name ? it.name : `${siglaOf(it.by) || "?"}-${it.offer}`;
+      const numChk = document.getElementById("trafficShowNum");
+      if (numChk) numChk.checked = showNum;
 
       offBox.innerHTML = order
         .map((code) => {
@@ -1458,7 +1469,7 @@
             .map(
               (it) => `
             <div class="trow" style="border-left-color:${dotOf(it.by)}">
-              <span class="tname">${it.name || `${siglaOf(it.by) || "?"}-${it.offer}`}${
+              <span class="tname">${dispName(it)}${
                 it.received ? ' <span class="gb">recebida</span>' : ""
               }</span>
               <span class="tmeta">
@@ -1488,7 +1499,7 @@
             <p class="sub">Leva 2 da quinta: só finaliza na segunda, não dá tempo pra esta sexta.</p>
             ${stays
               .map(
-                (it) => `<span class="grow"><b>${it.name || `${siglaOf(it.by) || "?"}-${it.offer}`}</b> · ${siglaOf(it.by) || it.by || "?"} · ✎ ${it.editor}</span>`
+                (it) => `<span class="grow"><b>${dispName(it)}</b> · ${siglaOf(it.by) || it.by || "?"} · ✎ ${it.editor}</span>`
               )
               .join("")}
           </div>`;
@@ -1536,6 +1547,8 @@
     function trafficAsText(week) {
       const cfg = STATE.config;
       const siglaOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).sigla || "";
+      const showNum = !!STATE.trafficShowNumbers;
+      const dispName = (it) => (showNum && it.name ? it.name : `${siglaOf(it.by) || "?"}-${it.offer}`);
       const ws = weekStartISO(week.num);
       const fri = fmtBR(uploadDayISO(week.num));
       const { byOffer, order, stays } = trafficBuildData(week);
@@ -1543,13 +1556,14 @@
 
       let out = `🚀 *SOBE NA SEXTA ${fri}*\n`;
       out += `_Semana ${week.num} · ${fmtBR(ws)}–${fmtBR(addDaysISO(ws, 6))} · ${total} criativo${total === 1 ? "" : "s"}_\n`;
+      if (!showNum) out += `_(numeração dos ads oculta — conferir com o ClickUp antes de subir)_\n`;
 
       order.forEach((code) => {
         const list = byOffer[code];
         out += `\n*${code} (${list.length})*\n`;
         list.forEach((it) => {
           const rec = it.received ? " _(gordura recebida)_" : "";
-          out += `• ${it.name} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}${rec}\n`;
+          out += `• ${dispName(it)} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}${rec}\n`;
         });
       });
 
@@ -1557,7 +1571,7 @@
         const nextFri = fmtBR(uploadDayISO(week.num + 1));
         out += `\n⏭ *FICA PRA PRÓXIMA SEXTA (${nextFri}):*\n`;
         stays.forEach((it) => {
-          out += `• ${it.name} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}\n`;
+          out += `• ${dispName(it)} — ${siglaOf(it.by) || it.by} · ✎ ${it.editor}\n`;
         });
       }
       return out.trim();
@@ -1569,6 +1583,8 @@
       const cfg = STATE.config;
       const siglaOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).sigla || "";
       const colorOf = (name) => (cfg.copyTeam.find((x) => x.name === name) || {}).color || "#8a91a3";
+      const showNum = !!STATE.trafficShowNumbers;
+      const dispName = (it) => (showNum && it.name ? it.name : `${siglaOf(it.by) || "?"}-${it.offer}`);
       const { byOffer, order, stays, all } = trafficBuildData(week);
       const fri = fmtBR(uploadDayISO(week.num));
 
@@ -1694,7 +1710,7 @@
             // nome
             ctx.fillStyle = "#e6e9ef";
             ctx.font = "700 12px ui-monospace, Menlo, monospace";
-            ctx.fillText(it.name, x + CARD_PAD + 12, ry + 20);
+            ctx.fillText(dispName(it), x + CARD_PAD + 12, ry + 20);
             // meta (direita)
             ctx.textAlign = "right";
             ctx.fillStyle = "#8a91a3";
@@ -1736,7 +1752,7 @@
           ctx.fillRect(gx, gy, 3, 24);
           ctx.fillStyle = "#e6e9ef";
           ctx.font = "700 12px ui-monospace, Menlo, monospace";
-          ctx.fillText(it.name, gx + 10, gy + 16);
+          ctx.fillText(dispName(it), gx + 10, gy + 16);
           ctx.fillStyle = "#8a91a3";
           ctx.font = "10px -apple-system, sans-serif";
           ctx.textAlign = "right";
@@ -2295,19 +2311,22 @@
         );
       const all = goesUp.concat(carryIn);
       const sig = (n) => { const p = cfg.copyTeam.find((x) => x.name === n); return p ? p.sigla : (n || "?"); };
+      const showNum = !!STATE.trafficShowNumbers;
+      const dispName = (it) => (showNum && it.name ? it.name : `${sig(it.by) || "?"}-${it.offer}`);
 
-      let txt = `🚀 SOBE NO SÁBADO ${sat} · ${all.length} criativos\n`;
+      let txt = `🚀 SOBE NA SEXTA ${sat} · ${all.length} criativos\n`;
+      if (!showNum) txt += `(numeração dos ads oculta — conferir com o ClickUp antes de subir)\n`;
       const byOffer = {};
       all.forEach((it) => (byOffer[it.offer] = byOffer[it.offer] || []).push(it));
       cfg.offers.map((o) => o.code).filter((c) => byOffer[c]).forEach((code) => {
         txt += `\n— ${code} (${byOffer[code].length}) —\n`;
         byOffer[code].forEach((it) => {
-          txt += `${it.name}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}${it.received ? "  (gordura recebida)" : ""}\n`;
+          txt += `${dispName(it)}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}${it.received ? "  (gordura recebida)" : ""}\n`;
         });
       });
       if (stays.length) {
-        txt += `\n⏭ FICA PRA PRÓXIMA (${fmtBR(uploadSaturdayISO(week.num + 1))}):\n`;
-        stays.forEach((it) => (txt += `${it.name}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}\n`));
+        txt += `\n⏭ FICA PRA PRÓXIMA (${fmtBR(uploadDayISO(week.num + 1))}):\n`;
+        stays.forEach((it) => (txt += `${dispName(it)}  ·  copy ${sig(it.by)}  ·  ed. ${it.editor}\n`));
       }
 
       if (navigator.clipboard)
@@ -2428,6 +2447,14 @@
           } catch (e) {
             toast("Erro ao gerar imagem: " + e.message, "err");
           }
+        };
+      }
+      const numChkEl = document.getElementById("trafficShowNum");
+      if (numChkEl) {
+        numChkEl.onchange = (e) => {
+          STATE.trafficShowNumbers = e.target.checked;
+          save();
+          renderTraffic(ensureWeek(STATE, STATE.current));
         };
       }
 
