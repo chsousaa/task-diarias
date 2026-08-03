@@ -704,6 +704,13 @@
       });
       // layout do calendário (default: operacional QUI→QUA)
       if (!s.layout) s.layout = "operational";
+      // correção one-shot: civilMondayISO calculado com o bug de fuso antigo
+      // (toISOString/UTC) ficou salvo errado antes do fix. Limpa pra recalcular
+      // certo na próxima vez que abrir a visão Civil.
+      if (!s.__civilTzFixed) {
+        s.civilMondayISO = null;
+        s.__civilTzFixed = true;
+      }
       // nomenclatura: migra formato antigo pro real (AD_CA-PACU80-84)
       if (!s.config.nomenclature || !s.config.nomenclature.includes("{ini}"))
         s.config.nomenclature = "AD_{COPY}-{OFERTA}{ini}-{fim}";
