@@ -356,6 +356,11 @@
       <button class="vt" data-view="traffic">🚀 Tráfego</button>
     </div>
 
+    <div class="viewtabs" id="layoutTabs" title="Layout dos dias">
+      <button class="vt active" data-layout="operational" title="Semana operacional (QUI→QUA) — reflete o pipeline copy→edição">🗓 Operacional</button>
+      <button class="vt" data-layout="civil" title="Semana civil (SEG→DOM) — visualização tradicional">📅 Civil</button>
+    </div>
+
     <div class="weeknav">
       <button id="prevWeek" class="icon-btn" title="Semana anterior">‹</button>
       <div class="week-label">
@@ -586,6 +591,8 @@
         },
         weeks: {},
         current: 1,
+        layout: "operational", // "operational" (QUI→QUA) ou "civil" (SEG→DOM)
+        civilMondayISO: null, // se null, calcula do HOJE
       };
     }
 
@@ -686,6 +693,8 @@
         if (o.priority == null)
           o.priority = DEFAULT_PRI[o.code] != null ? DEFAULT_PRI[o.code] : i + 10;
       });
+      // layout do calendário (default: operacional QUI→QUA)
+      if (!s.layout) s.layout = "operational";
       // nomenclatura: migra formato antigo pro real (AD_CA-PACU80-84)
       if (!s.config.nomenclature || !s.config.nomenclature.includes("{ini}"))
         s.config.nomenclature = "AD_{COPY}-{OFERTA}{ini}-{fim}";
@@ -1073,23 +1082,73 @@
       return addDaysISO(STATE.config.weekStart, (num - 1) * 7);
     }
 
+    // Descobre em qual semana operacional (num, offset 0..6) uma data ISO está.
+    // Usado pela visualização CIVIL pra puxar cards da semana op correta.
+    function findOpWeek(iso) {
+      const days = Math.round((new Date(iso) - new Date(STATE.config.weekStart)) / 86400000);
+      const n = Math.floor(days / 7) + 1;
+      const off = ((days % 7) + 7) % 7;
+      return { num: n, off };
+    }
+    function offToColKey(off) {
+      // COPY_COLS[off] mapeia offset 0..6 → chave qui/sex/sab/dom/seg/ter/qua
+      return COPY_COLS[off] ? COPY_COLS[off].key : null;
+    }
+
+    // Início da semana CIVIL (segunda) que contém uma data ISO
+    function mondayOfISO(iso) {
+      const d = new Date(iso);
+      const day = d.getDay(); // 0=dom … 1=seg … 6=sáb
+      const back = (day + 6) % 7; // dias até a segunda
+      d.setDate(d.getDate() - back);
+      return d.toISOString().slice(0, 10);
+    }
+    // Nº da "semana civil" ancorado na Semana 1 op (a segunda que corresponde
+    // à semana civil da quinta configurada). Usado só como identificador na UI.
+    function civilAnchorMonday() {
+      return mondayOfISO(STATE.config.weekStart);
+    }
+
     function render() {
       const week = ensureWeek(STATE, STATE.current);
-      document.getElementById("weekTitle").textContent =
-        (week.num === 0 ? "Semana 0 · doc S6" : `Semana ${week.num}`) + (week.locked ? " 🔒" : "");
+      const isCivil = STATE.layout === "civil";
 
-      const lockBtn = document.getElementById("lockWeek");
-      if (lockBtn) {
-        lockBtn.textContent = week.locked ? "🔒 Travada" : "🔓 Travar";
-        lockBtn.classList.toggle("locked", !!week.locked);
-        lockBtn.title = week.locked
-          ? "Semana REAL protegida — clique para destravar"
-          : "Travar: marca como semana REAL e impede regerar por cima";
+      // reflete o layout ativo no toggle
+      document.querySelectorAll("#layoutTabs .vt").forEach((b) =>
+        b.classList.toggle("active", b.dataset.layout === (isCivil ? "civil" : "operational"))
+      );
+
+      if (isCivil) {
+        // Ancora numa segunda da semana civil. Se null, usa a semana civil de HOJE.
+        if (!STATE.civilMondayISO) STATE.civilMondayISO = mondayOfISO(todayISO());
+        const seg = STATE.civilMondayISO;
+        const dom = addDaysISO(seg, 6);
+        document.getElementById("weekTitle").textContent = `Semana civil`;
+        document.getElementById("weekDates").textContent = `${fmtBR(seg)} – ${fmtBR(dom)}`;
+        // controles de trava/gerar são por semana OPERACIONAL — na visão civil,
+        // não faz sentido; desabilita pra não bagunçar dados de várias semanas
+        const lockBtn = document.getElementById("lockWeek");
+        if (lockBtn) { lockBtn.disabled = true; lockBtn.title = "Disponível no layout Operacional"; }
+        document.getElementById("generateBtn").disabled = true;
+        document.getElementById("generateBtn").title = "Disponível no layout Operacional";
+      } else {
+        document.getElementById("weekTitle").textContent =
+          (week.num === 0 ? "Semana 0 · doc S6" : `Semana ${week.num}`) + (week.locked ? " 🔒" : "");
+        const lockBtn = document.getElementById("lockWeek");
+        if (lockBtn) {
+          lockBtn.disabled = false;
+          lockBtn.textContent = week.locked ? "🔒 Travada" : "🔓 Travar";
+          lockBtn.classList.toggle("locked", !!week.locked);
+          lockBtn.title = week.locked
+            ? "Semana REAL protegida — clique para destravar"
+            : "Travar: marca como semana REAL e impede regerar por cima";
+        }
+        document.getElementById("generateBtn").disabled = !!week.locked;
+        document.getElementById("generateBtn").title = "";
+        const start = weekStartISO(week.num);
+        document.getElementById("weekDates").textContent =
+          `${fmtBR(start)} – ${fmtBR(addDaysISO(start, 6))}`;
       }
-      document.getElementById("generateBtn").disabled = !!week.locked;
-      const start = weekStartISO(week.num);
-      document.getElementById("weekDates").textContent =
-        `${fmtBR(start)} – ${fmtBR(addDaysISO(start, 6))}`;
 
       renderMetaBar(week);
       renderBoard("copy", week);
@@ -1611,13 +1670,41 @@
 
     function renderBoard(kind, week) {
       const cfg = STATE.config;
-      const cols = kind === "copy" ? COPY_COLS : EDIT_COLS;
+      const isCivil = STATE.layout === "civil";
       const people =
         kind === "copy"
           ? cfg.copyTeam.filter((p) => p.active)
           : cfg.editTeam.filter((p) => p.active);
       const gridEl = document.getElementById(kind === "copy" ? "copyGrid" : "editGrid");
-      const start = weekStartISO(week.num);
+
+      // Monta as colunas conforme o layout escolhido.
+      // Cada coluna tem: label, iso (data absoluta), weekend, srcWeekNum, srcColKey
+      let cols;
+      if (isCivil) {
+        // SEG a DOM, ancorados em STATE.civilMondayISO
+        const seg = STATE.civilMondayISO;
+        const civilLabels = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+        cols = civilLabels.map((label, i) => {
+          const iso = addDaysISO(seg, i);
+          const { num, off } = findOpWeek(iso);
+          const srcKey = offToColKey(off);
+          // pra EDIT, o "dia útil" é diferente (fim de semana = pausa)
+          const weekend = i >= 5; // SAB e DOM
+          return { label, iso, weekend, srcWeekNum: num, srcColKey: srcKey };
+        });
+      } else {
+        // Operacional: comportamento original (QUI→QUA copy, SEX→QUI edit)
+        const start = weekStartISO(week.num);
+        const base = kind === "copy" ? COPY_COLS : EDIT_COLS;
+        cols = base.map((col) => ({
+          label: col.label,
+          iso: addDaysISO(start, col.off),
+          weekend: !!col.weekend,
+          srcWeekNum: week.num,
+          srcColKey: col.key,
+          key: col.key,
+        }));
+      }
 
       gridEl.style.gridTemplateColumns = `140px repeat(${cols.length}, minmax(96px, 1fr))`;
       gridEl.innerHTML = "";
@@ -1628,14 +1715,14 @@
 
       const tISO = todayISO();
       cols.forEach((col) => {
-        const colISO = addDaysISO(start, col.off);
         const h = document.createElement("div");
         let cls = "head";
         if (col.weekend) cls += " weekend";
-        if (DEADLINES[kind][col.key]) cls += " " + DEADLINES[kind][col.key];
-        if (colISO === tISO) cls += " today";
+        // linhas de prazo (vermelho/verde/azul) só fazem sentido no operacional
+        if (!isCivil && DEADLINES[kind][col.srcColKey]) cls += " " + DEADLINES[kind][col.srcColKey];
+        if (col.iso === tISO) cls += " today";
         h.className = cls;
-        h.innerHTML = `${col.label}<small>${fmtBR(colISO)}</small>${colISO === tISO ? '<em class="today-tag">hoje</em>' : ""}`;
+        h.innerHTML = `${col.label}<small>${fmtBR(col.iso)}</small>${col.iso === tISO ? '<em class="today-tag">hoje</em>' : ""}`;
         gridEl.appendChild(h);
       });
 
@@ -1648,24 +1735,28 @@
 
         cols.forEach((col) => {
           const cell = document.createElement("div");
-          const isToday = addDaysISO(start, col.off) === tISO;
+          const isToday = col.iso === tISO;
           cell.className = "cell" + (col.weekend ? " weekend" : "") + (isToday ? " today" : "");
           cell.dataset.kind = kind;
           cell.dataset.person = person.name;
-          cell.dataset.col = col.key;
+          cell.dataset.col = col.srcColKey || "";
 
-          const store = week[kind][person.name];
-          if (store) {
+          // No modo civil, cada coluna pode vir de uma semana op diferente.
+          // Busca a semana correspondente (se existir) e o card.
+          const srcWeek = STATE.weeks[col.srcWeekNum];
+          const store = srcWeek && srcWeek[kind] && srcWeek[kind][person.name];
+          if (store && col.srcColKey) {
             if (kind === "copy") {
-              const a = store[col.key];
-              if (a) cell.appendChild(makeCard(a, cfg, kind, person.name, col.key));
+              const a = store[col.srcColKey];
+              if (a) cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey));
             } else {
-              (store[col.key] || []).forEach((a) =>
-                cell.appendChild(makeCard(a, cfg, kind, person.name, col.key))
+              (store[col.srcColKey] || []).forEach((a) =>
+                cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey))
               );
             }
           }
-          attachDrop(cell);
+          // Drag-drop só no operacional (no civil pode misturar semanas diferentes)
+          if (!isCivil) attachDrop(cell);
           gridEl.appendChild(cell);
         });
       });
@@ -2060,7 +2151,7 @@
       document.getElementById("trafficView").classList.toggle("hidden", isPlan);
       // botões de ação que só fazem sentido no planejamento
       document.getElementById("generateBtn").style.display = isPlan ? "" : "none";
-      document.querySelectorAll(".viewtabs .vt").forEach((b) =>
+      document.querySelectorAll("#viewTabs .vt").forEach((b) =>
         b.classList.toggle("active", b.dataset.view === view)
       );
       if (!isPlan) renderTraffic(ensureWeek(STATE, STATE.current));
@@ -2134,17 +2225,39 @@
       }
 
       // troca de aba Planejamento / Tráfego
-      document.querySelectorAll(".viewtabs .vt").forEach((b) =>
+      document.querySelectorAll("#viewTabs .vt").forEach((b) =>
         (b.onclick = () => switchView(b.dataset.view))
       );
 
+      // troca de layout Operacional / Civil (só afeta a visualização)
+      document.querySelectorAll("#layoutTabs .vt").forEach((b) =>
+        (b.onclick = () => {
+          STATE.layout = b.dataset.layout;
+          if (STATE.layout === "civil" && !STATE.civilMondayISO)
+            STATE.civilMondayISO = mondayOfISO(todayISO());
+          save();
+          render();
+        })
+      );
+
       document.getElementById("prevWeek").onclick = () => {
-        if (STATE.current > 0) { STATE.current--; render(); }
+        if (STATE.layout === "civil") {
+          STATE.civilMondayISO = addDaysISO(STATE.civilMondayISO || mondayOfISO(todayISO()), -7);
+          render();
+        } else if (STATE.current > 0) {
+          STATE.current--;
+          render();
+        }
       };
       document.getElementById("nextWeek").onclick = () => {
-        STATE.current++;
-        ensureWeek(STATE, STATE.current);
-        render();
+        if (STATE.layout === "civil") {
+          STATE.civilMondayISO = addDaysISO(STATE.civilMondayISO || mondayOfISO(todayISO()), 7);
+          render();
+        } else {
+          STATE.current++;
+          ensureWeek(STATE, STATE.current);
+          render();
+        }
       };
 
       document.getElementById("addOffer").onclick = () => {
