@@ -565,6 +565,7 @@
         config: {
           offers: [
             { code: "OTIT", color: "#ffab5c", active: true, priority: 1 },
+            { code: "OTIG", color: "#5cffd6", active: true, priority: 1, fixedPerCopy: true },
             { code: "PACU", color: "#35c98a", active: true, priority: 2 },
             { code: "TRCA", color: "#ff5c6a", active: false, priority: 3 },
             { code: "OREG", color: "#47a6ff", active: false, priority: 4 },
@@ -702,6 +703,22 @@
         if (o.priority == null)
           o.priority = DEFAULT_PRI[o.code] != null ? DEFAULT_PRI[o.code] : i + 10;
       });
+      // Nova oferta OTIG (Otite Iogurte) — fixa: 1 leva garantida por copy/semana,
+      // prioridade igual ao OTIT (nunca vira gordura). Adicionada em 04/08/2026.
+      if (!s.config.offers.some((o) => o.code === "OTIG")) {
+        s.config.offers.push({
+          code: "OTIG",
+          color: "#5cffd6",
+          active: true,
+          priority: 1,
+          fixedPerCopy: true,
+        });
+      }
+      (s.config.copyTeam || []).forEach((p) => {
+        if (!s.config.adBase[p.name]) s.config.adBase[p.name] = {};
+        if (s.config.adBase[p.name].OTIG == null) s.config.adBase[p.name].OTIG = 0;
+      });
+
       // layout do calendário (default: operacional QUI→QUA)
       if (!s.layout) s.layout = "operational";
       // correção one-shot: civilMondayISO calculado com o bug de fuso antigo
@@ -785,14 +802,33 @@
       const cfg = STATE.config;
       const week = ensureWeek(STATE, num);
 
-      // ---- pool de levas a partir das quantidades
+      const copies = cfg.copyTeam.filter((p) => p.active).map((p) => p.name);
+
+      // ---- Ofertas FIXAS (1 leva garantida por copy/semana) ficam de fora
+      // do sorteio geral: são reservadas direto num dia (não no último dia,
+      // pra nunca disputar com a lógica de gordura/prioridade do rotPerson).
+      const fixedOffs = activeOffers(cfg).filter((o) => o.fixedPerCopy);
+      const nonLastDays = COPY_WORK.slice(0, -1);
+      const reserved = {}; // reserved[pessoa][diaKey] = offerCode
+      copies.forEach((p) => (reserved[p] = {}));
+      fixedOffs.forEach((o) => {
+        week.meta[o.code] = copies.length; // sempre 1 por copy ativo
+        copies.forEach((p) => {
+          const avail = nonLastDays.filter((c) => !reserved[p][c.key]);
+          const day = avail[Math.floor(Math.random() * avail.length)] || nonLastDays[0];
+          reserved[p][day.key] = o.code;
+        });
+      });
+
+      // ---- pool de levas a partir das quantidades (exclui ofertas fixas)
       let pool = [];
       Object.entries(week.meta).forEach(([code, q]) => {
+        const def = cfg.offers.find((o) => o.code === code);
+        if (def && def.fixedPerCopy) return;
         for (let i = 0; i < q; i++) pool.push(code);
       });
       shuffle(pool);
 
-      const copies = cfg.copyTeam.filter((p) => p.active).map((p) => p.name);
       const siglaOf = {};
       cfg.copyTeam.forEach((p) => (siglaOf[p.name] = p.sigla || ""));
       const nomen = makeNomenclator(cfg);
@@ -839,13 +875,17 @@
         const todays = [];
         const usedToday = []; // mistura o dia: evita todo mundo na mesma oferta
         for (const p of copies) {
-          if (pool.length === 0) break;
           let code;
-          // PRIORIDADE: no último dia, a rotPerson pega a oferta MENOS
-          // prioritária disponível — ela vira gordura, protegendo as prioritárias.
-          if (isLastDay && p === rotPerson) {
+          const reservedCode = reserved[p] && reserved[p][col.key];
+          if (reservedCode) {
+            // oferta fixa: já reservada pra este dia, não consome o pool
+            code = reservedCode;
+          } else if (pool.length === 0) {
+            continue; // sem pool hoje pra essa pessoa — mas outros dias/pessoas seguem
+          } else if (isLastDay && p === rotPerson) {
+            // PRIORIDADE: no último dia, a rotPerson pega a oferta MENOS
+            // prioritária disponível — ela vira gordura, protegendo as prioritárias.
             const leastPri = leastPriorityInPool(cfg, pool);
-            // ainda respeita anti-repetição se der
             let idx = pool.findIndex((o) => o === leastPri && o !== lastOffer[p]);
             if (idx < 0) idx = pool.indexOf(leastPri);
             code = pool.splice(idx, 1)[0];
@@ -1623,7 +1663,9 @@
         bar.appendChild(hint);
       }
 
+      const activeCopies = cfg.copyTeam.filter((p) => p.active).length;
       offs.forEach((o) => {
+        if (o.fixedPerCopy) week.meta[o.code] = activeCopies; // sempre 1x por copy
         if (!(o.code in week.meta)) week.meta[o.code] = 0;
         const meta = week.meta[o.code] || 0;
         const c = counts[o.code];
@@ -1641,6 +1683,8 @@
             <small>${
               c.placed
                 ? `${c.placed} na semana${c.carryIn ? ` · +${c.carryIn} gordura` : ""}${c.gorduraOut ? ` · ${c.gorduraOut}→próx` : ""} · sobe ${effective}`
+                : o.fixedPerCopy
+                ? `1x por copy (${activeCopies} fixo)`
                 : "quantas levas?"
             }</small>
           </div>`;
@@ -1649,12 +1693,17 @@
         inp.min = "0";
         inp.className = "qty";
         inp.value = meta;
-        inp.title = `Meta de ${o.code} na semana`;
-        inp.addEventListener("input", (e) => {
-          week.meta[o.code] = +e.target.value || 0;
-          save();
-          updateTotalChip(week);
-        });
+        if (o.fixedPerCopy) {
+          inp.disabled = true;
+          inp.title = `${o.code} é fixa: sempre 1 leva por copy ativo (${activeCopies}).`;
+        } else {
+          inp.title = `Meta de ${o.code} na semana`;
+          inp.addEventListener("input", (e) => {
+            week.meta[o.code] = +e.target.value || 0;
+            save();
+            updateTotalChip(week);
+          });
+        }
         chip.appendChild(inp);
         bar.appendChild(chip);
       });
@@ -1976,6 +2025,7 @@
         <span style="flex:1">código</span>
         <span title="menor nº = mais prioritária. A oferta MENOS prioritária vira gordura." style="width:44px;text-align:center">prio</span>
         <span style="width:50px">ativa</span>
+        <span style="width:66px" title="Reserva 1 leva garantida por copy/semana, fora do sorteio geral.">1x/copy</span>
         <span style="width:15px"></span>
       </div>`;
       STATE.config.offers.forEach((o, i) => {
@@ -1986,6 +2036,7 @@
           <input type="text" value="${o.code}" data-i="${i}" data-f="code" maxlength="6" />
           <input type="number" min="1" max="99" value="${o.priority || 99}" data-i="${i}" data-f="priority" title="Prioridade (menor = mais prioritária). A menos prioritária vira gordura." style="width:44px;flex:none;text-align:center" />
           <label class="tgl"><input type="checkbox" ${o.active ? "checked" : ""} data-i="${i}" data-f="active" /> ativa</label>
+          <label class="tgl" title="Garante 1 leva desta oferta por copy toda semana, fora do sorteio geral"><input type="checkbox" ${o.fixedPerCopy ? "checked" : ""} data-i="${i}" data-f="fixedPerCopy" /> 1x/copy</label>
           <button class="del" data-del="${i}">×</button>`;
         wrap.appendChild(row);
       });
@@ -1996,6 +2047,7 @@
           if (f === "active") o.active = e.target.checked;
           else if (f === "code") o.code = e.target.value.toUpperCase();
           else if (f === "priority") o.priority = +e.target.value || 99;
+          else if (f === "fixedPerCopy") o.fixedPerCopy = e.target.checked;
           else o.color = e.target.value;
         })
       );
