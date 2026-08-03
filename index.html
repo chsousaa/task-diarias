@@ -599,24 +599,33 @@
     /* ---------- Helpers ---------- */
     // Âncora da semana = quinta-feira da SEMANA ATUAL (a quinta mais recente
     // <= hoje). A semana do copy vai QUI→QUA, então qualquer dia útil cai nela.
+    // Todas as funções abaixo trabalham em fuso LOCAL (não UTC) — importante
+    // porque o app se ancora no dia do calendário do usuário. toISOString retorna
+    // UTC e causa off-by-one perto da meia-noite.
+    function _isoLocal(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
     function nextThursdayISO() {
       const d = new Date();
       const day = d.getDay(); // 0=dom … 4=qui … 6=sáb
       const back = (day - 4 + 7) % 7; // dias desde a última quinta
       d.setDate(d.getDate() - back);
-      return d.toISOString().slice(0, 10);
+      return _isoLocal(d);
     }
     function addDaysISO(iso, n) {
-      const d = new Date(iso + "T00:00:00");
+      const d = new Date(iso + "T12:00:00");
       d.setDate(d.getDate() + n);
-      return d.toISOString().slice(0, 10);
+      return _isoLocal(d);
     }
     function fmtBR(iso) {
       const [y, m, d] = iso.split("-");
       return `${d}/${m}`;
     }
     function todayISO() {
-      return new Date().toISOString().slice(0, 10);
+      return _isoLocal(new Date());
     }
     function shuffle(a) {
       for (let i = a.length - 1; i > 0; i--) {
@@ -1095,13 +1104,24 @@
       return COPY_COLS[off] ? COPY_COLS[off].key : null;
     }
 
+    // Constrói Date em MEIO-DIA local pra evitar bug de fuso (ISO 00:00 é UTC).
+    function parseISOLocal(iso) {
+      return new Date(iso + "T12:00:00");
+    }
+    function isoOfLocalDate(d) {
+      // usa componentes locais (não d.toISOString, que é UTC)
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
     // Início da semana CIVIL (segunda) que contém uma data ISO
     function mondayOfISO(iso) {
-      const d = new Date(iso);
+      const d = parseISOLocal(iso);
       const day = d.getDay(); // 0=dom … 1=seg … 6=sáb
       const back = (day + 6) % 7; // dias até a segunda
       d.setDate(d.getDate() - back);
-      return d.toISOString().slice(0, 10);
+      return isoOfLocalDate(d);
     }
     // Nº da "semana civil" ancorado na Semana 1 op (a segunda que corresponde
     // à semana civil da quinta configurada). Usado só como identificador na UI.
