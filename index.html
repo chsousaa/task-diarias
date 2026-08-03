@@ -559,11 +559,11 @@
       return {
         config: {
           offers: [
-            { code: "PACU", color: "#35c98a", active: true },
-            { code: "OTIT", color: "#ffab5c", active: true },
-            { code: "TRCA", color: "#ff5c6a", active: false },
-            { code: "OREG", color: "#47a6ff", active: false },
-            { code: "CAIN", color: "#b98cff", active: false },
+            { code: "OTIT", color: "#ffab5c", active: true, priority: 1 },
+            { code: "PACU", color: "#35c98a", active: true, priority: 2 },
+            { code: "TRCA", color: "#ff5c6a", active: false, priority: 3 },
+            { code: "OREG", color: "#47a6ff", active: false, priority: 4 },
+            { code: "CAIN", color: "#b98cff", active: false, priority: 5 },
           ],
           copyTeam: [
             { name: "Carlos", sigla: "CA", color: "#4d9bff", active: true },
@@ -624,6 +624,18 @@
       const o = cfg.offers.find((x) => x.code === code);
       return o ? o.color : "#8a91a3";
     }
+    function offerPriority(cfg, code) {
+      const o = cfg.offers.find((x) => x.code === code);
+      return o && o.priority != null ? o.priority : 99;
+    }
+    // maior "priority" = MENOS prioritária. Retorna o código da oferta menos
+    // prioritária presente no pool (candidata a virar gordura).
+    function leastPriorityInPool(cfg, pool) {
+      if (!pool.length) return null;
+      return pool.reduce((a, b) =>
+        offerPriority(cfg, b) > offerPriority(cfg, a) ? b : a
+      );
+    }
 
     /* ---------- Persistência ---------- */
     let STATE = load();
@@ -667,6 +679,13 @@
       if (s.config.adsPorLeva == null) s.config.adsPorLeva = 5;
       if (!s.config.adBase || Object.keys(s.config.adBase).length === 0)
         s.config.adBase = JSON.parse(JSON.stringify(DEFAULT_AD_BASE));
+      // prioridade das ofertas: menor nº = mais prioritária.
+      // Ofertas prioritárias NÃO viram gordura (ficam na semana).
+      const DEFAULT_PRI = { OTIT: 1, PACU: 2, TRCA: 3, OREG: 4, CAIN: 5 };
+      (s.config.offers || []).forEach((o, i) => {
+        if (o.priority == null)
+          o.priority = DEFAULT_PRI[o.code] != null ? DEFAULT_PRI[o.code] : i + 10;
+      });
       // nomenclatura: migra formato antigo pro real (AD_CA-PACU80-84)
       if (!s.config.nomenclature || !s.config.nomenclature.includes("{ini}"))
         s.config.nomenclature = "AD_{COPY}-{OFERTA}{ini}-{fim}";
@@ -786,17 +805,32 @@
       const flat = [];
       const perDay = []; // levas por dia de escrita (alinha com o dia de edição)
 
+      // rodízio de quem fica com a leva que atrasa (justiça entre os copys)
+      const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
+      const lastCol = COPY_WORK[COPY_WORK.length - 1];
+
       for (const col of COPY_WORK) {
+        const isLastDay = col === lastCol;
         const todays = [];
         const usedToday = []; // mistura o dia: evita todo mundo na mesma oferta
         for (const p of copies) {
           if (pool.length === 0) break;
-          // 1º: oferta != última da pessoa E ainda não usada hoje;
-          // 2º: oferta != última da pessoa; 3º: qualquer uma
-          let idx = pool.findIndex((o) => o !== lastOffer[p] && !usedToday.includes(o));
-          if (idx < 0) idx = pool.findIndex((o) => o !== lastOffer[p]);
-          if (idx < 0) idx = 0;
-          const code = pool.splice(idx, 1)[0];
+          let code;
+          // PRIORIDADE: no último dia, a rotPerson pega a oferta MENOS
+          // prioritária disponível — ela vira gordura, protegendo as prioritárias.
+          if (isLastDay && p === rotPerson) {
+            const leastPri = leastPriorityInPool(cfg, pool);
+            // ainda respeita anti-repetição se der
+            let idx = pool.findIndex((o) => o === leastPri && o !== lastOffer[p]);
+            if (idx < 0) idx = pool.indexOf(leastPri);
+            code = pool.splice(idx, 1)[0];
+          } else {
+            // seleção normal com anti-repetição e mistura no dia
+            let idx = pool.findIndex((o) => o !== lastOffer[p] && !usedToday.includes(o));
+            if (idx < 0) idx = pool.findIndex((o) => o !== lastOffer[p]);
+            if (idx < 0) idx = 0;
+            code = pool.splice(idx, 1)[0];
+          }
           usedToday.push(code);
           const [n1, n2] = takeRange(p, code);
           const a = { uid: uid(), id: nomen(code, siglaOf[p], n1, n2), offer: code, by: p, n1, n2, gordura: false };
@@ -807,9 +841,6 @@
         }
         perDay.push(todays);
       }
-
-      // rodízio de quem fica com a leva que atrasa (justiça entre os copys)
-      const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
 
       // ---- EDIÇÃO: deriva do copy dia a dia (defasagem de 1 dia útil)
       // a leva dupla intercala TAMBÉM entre semanas: quem dobrou no último
@@ -1822,13 +1853,20 @@
 
     function renderOffersList() {
       const wrap = document.getElementById("offersList");
-      wrap.innerHTML = "";
+      wrap.innerHTML = `<div class="mini-row" style="background:transparent;border:none;padding:0 8px;font-size:11px;color:var(--muted)">
+        <span style="width:20px"></span>
+        <span style="flex:1">código</span>
+        <span title="menor nº = mais prioritária. A oferta MENOS prioritária vira gordura." style="width:44px;text-align:center">prio</span>
+        <span style="width:50px">ativa</span>
+        <span style="width:15px"></span>
+      </div>`;
       STATE.config.offers.forEach((o, i) => {
         const row = document.createElement("div");
         row.className = "mini-row";
         row.innerHTML = `
           <input type="color" class="swatch" value="${o.color}" data-i="${i}" data-f="color" />
           <input type="text" value="${o.code}" data-i="${i}" data-f="code" maxlength="6" />
+          <input type="number" min="1" max="99" value="${o.priority || 99}" data-i="${i}" data-f="priority" title="Prioridade (menor = mais prioritária). A menos prioritária vira gordura." style="width:44px;flex:none;text-align:center" />
           <label class="tgl"><input type="checkbox" ${o.active ? "checked" : ""} data-i="${i}" data-f="active" /> ativa</label>
           <button class="del" data-del="${i}">×</button>`;
         wrap.appendChild(row);
@@ -1839,6 +1877,7 @@
           const o = STATE.config.offers[i];
           if (f === "active") o.active = e.target.checked;
           else if (f === "code") o.code = e.target.value.toUpperCase();
+          else if (f === "priority") o.priority = +e.target.value || 99;
           else o.color = e.target.value;
         })
       );
@@ -2110,10 +2149,12 @@
 
       document.getElementById("addOffer").onclick = () => {
         const palette = ["#35c98a", "#ffab5c", "#ff5c6a", "#47a6ff", "#b98cff", "#ffcf5c", "#5cffd6"];
+        const nextPri = Math.max(0, ...STATE.config.offers.map((o) => o.priority || 0)) + 1;
         STATE.config.offers.push({
           code: "NOVA",
           color: palette[STATE.config.offers.length % palette.length],
           active: true,
+          priority: nextPri,
         });
         renderOffersList();
       };
