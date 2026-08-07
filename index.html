@@ -2585,7 +2585,17 @@
     }
 
     /* ---------- Boot ---------- */
-    ensureWeek(STATE, STATE.current);
+    // Sempre abre na semana que contém HOJE (não fica preso na última vista).
+    (function jumpToToday() {
+      const tISO = todayISO();
+      // qual semana operacional contém hoje (nº pode ser 0 ou negativo se hoje
+      // for antes da Semana 1 — nesse caso fica na 1)
+      const wk = findOpWeek(tISO).num;
+      STATE.current = Math.max(1, wk);
+      ensureWeek(STATE, STATE.current);
+      // no layout civil, também aponta pra semana civil de hoje
+      STATE.civilMondayISO = mondayOfISO(tISO);
+    })();
     bind();
     render();
   </script>
