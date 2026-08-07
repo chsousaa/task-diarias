@@ -7,6 +7,7 @@
   <meta name="googlebot" content="noindex, nofollow" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #0f1117;
@@ -36,6 +37,37 @@
       font-size: 14px;
       min-height: 100vh;
     }
+
+    /* ===== Tela de login ===== */
+    .auth-gate {
+      position: fixed; inset: 0; z-index: 500;
+      background: radial-gradient(1200px 600px at 50% -10%, #1b2030, var(--bg));
+      display: grid; place-items: center; padding: 20px;
+    }
+    .auth-gate.hidden { display: none; }
+    .auth-box {
+      width: min(360px, 100%); background: var(--bg-2);
+      border: 1px solid var(--line); border-radius: 16px;
+      padding: 32px 28px; box-shadow: var(--shadow); text-align: center;
+    }
+    .auth-logo {
+      font-size: 26px; color: var(--accent); background: var(--bg-3);
+      width: 52px; height: 52px; display: grid; place-items: center;
+      border-radius: 13px; border: 1px solid var(--line); margin: 0 auto 14px;
+    }
+    .auth-box h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+    .auth-sub { color: var(--muted); font-size: 13px; margin: 6px 0 22px; }
+    .auth-box input {
+      width: 100%; margin-bottom: 12px; padding: 12px 14px; font-size: 14px;
+      background: var(--bg-3); border: 1px solid var(--line); border-radius: 9px; color: var(--text);
+    }
+    .auth-box input:focus { outline: none; border-color: var(--accent); }
+    .auth-submit { width: 100%; padding: 12px; font-size: 15px; margin-top: 4px; }
+    .auth-alt { color: var(--muted); font-size: 12px; margin: 16px 0 0; }
+    .auth-alt span { color: var(--accent); cursor: pointer; font-weight: 600; }
+    .auth-msg { font-size: 12px; margin: 12px 0 0; min-height: 16px; }
+    .auth-msg.err { color: var(--red); }
+    .auth-msg.ok { color: var(--green); }
 
     /* ===== Topbar ===== */
     .topbar {
@@ -345,6 +377,20 @@
   </style>
 </head>
 <body>
+  <!-- ===== Tela de login (cobre o app até autenticar) ===== -->
+  <div id="authGate" class="auth-gate">
+    <div class="auth-box">
+      <div class="auth-logo">▣</div>
+      <h1>TASK DIÁRIAS</h1>
+      <p class="auth-sub" id="authSub">Entre pra acessar o planejamento</p>
+      <input id="authEmail" type="email" placeholder="seu email" autocomplete="email" />
+      <input id="authPass" type="password" placeholder="sua senha" autocomplete="current-password" />
+      <button id="authBtn" class="btn primary auth-submit">Entrar</button>
+      <p class="auth-alt">Ainda não tem conta? <span id="authToggle">Criar conta</span></p>
+      <p class="auth-msg" id="authMsg"></p>
+    </div>
+  </div>
+
   <header class="topbar">
     <div class="brand">
       <span class="logo">▣</span>
@@ -505,6 +551,13 @@
             <input id="importData" type="file" accept="application/json,.json" style="display:none" />
           </label>
         </div>
+
+        <hr />
+        <h3>Conta</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:12px">
+          <span id="acctEmail">—</span> · dados sincronizados na nuvem 🔒
+        </p>
+        <button id="logoutBtn" class="btn small">🚪 Sair da conta</button>
       </div>
 
       <div class="modal-foot">
@@ -526,6 +579,8 @@
        ============================================================ */
 
     const STORE_KEY = "task_diarias_v1";
+    // nuvem/login (inicializados no boot; declarados aqui p/ evitar TDZ no save())
+    let sb = null, cloudUserId = null, cloudSaveTimer = null;
 
     /* ---------- Calendário das grades ----------
        COPY: semana começa QUI (defasagem). SÁB/DOM folga.
@@ -780,6 +835,7 @@
     }
     function save() {
       try { localStorage.setItem(STORE_KEY, JSON.stringify(STATE)); } catch (e) {}
+      scheduleCloudSave(); // também sincroniza pra nuvem (se logado)
     }
 
     function ensureWeek(state, num) {
@@ -2132,6 +2188,17 @@
       document.getElementById("nomenclature").value = cfg.nomenclature;
       document.getElementById("weekStart").value = cfg.weekStart;
       renderAdBaseGrid();
+      // email da conta logada
+      const acct = document.getElementById("acctEmail");
+      if (acct) {
+        if (sb && cloudUserId) {
+          sb.auth.getUser().then(({ data }) => {
+            acct.textContent = (data && data.user && data.user.email) || "conectado";
+          });
+        } else {
+          acct.textContent = "modo local (sem login)";
+        }
+      }
       document.getElementById("configModal").classList.remove("hidden");
     }
 
@@ -2581,26 +2648,153 @@
           toast("Resetado.", "ok");
         }
       };
+      const logoutEl = document.getElementById("logoutBtn");
+      if (logoutEl) logoutEl.onclick = () => {
+        if (confirm("Sair da conta? Você vai precisar entrar de novo.")) logout();
+      };
 
       document.getElementById("configModal").addEventListener("click", (e) => {
         if (e.target.id === "configModal") closeConfig();
       });
     }
 
-    /* ---------- Boot ---------- */
-    // Sempre abre na semana que contém HOJE (não fica preso na última vista).
-    (function jumpToToday() {
+    /* ============================================================
+       NUVEM + LOGIN (Supabase) — segurança de verdade no servidor
+       ============================================================ */
+    const SB_URL = "https://vdotdblluwfogjmdjlob.supabase.co";
+    const SB_PUBLISHABLE = "sb_publishable_7pP6IIDLZzdQtIgQJoIpZw_SKT1smZ0";
+    try {
+      if (window.supabase) sb = window.supabase.createClient(SB_URL, SB_PUBLISHABLE);
+    } catch (e) { console.warn("Supabase indisponível:", e); }
+
+    async function cloudLoad(userId) {
+      if (!sb) return null;
+      try {
+        const { data, error } = await sb
+          .from("app_state").select("data").eq("user_id", userId).maybeSingle();
+        if (error) { console.warn("cloudLoad", error); return null; }
+        return data ? data.data : null;
+      } catch (e) { console.warn("cloudLoad ex", e); return null; }
+    }
+    async function cloudSaveNow() {
+      if (!sb || !cloudUserId) return;
+      try {
+        const { error } = await sb.from("app_state").upsert(
+          { user_id: cloudUserId, data: STATE, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+        if (error) console.warn("cloudSave", error);
+      } catch (e) { console.warn("cloudSave ex", e); }
+    }
+    function scheduleCloudSave() {
+      if (!sb || !cloudUserId) return;
+      clearTimeout(cloudSaveTimer);
+      cloudSaveTimer = setTimeout(cloudSaveNow, 1200);
+    }
+
+    // Coloca o app na semana de hoje e renderiza
+    function jumpToTodayAndRender() {
       const tISO = todayISO();
-      // qual semana operacional contém hoje (nº pode ser 0 ou negativo se hoje
-      // for antes da Semana 1 — nesse caso fica na 1)
       const wk = findOpWeek(tISO).num;
       STATE.current = Math.max(1, wk);
       ensureWeek(STATE, STATE.current);
-      // no layout civil, também aponta pra semana civil de hoje
       STATE.civilMondayISO = mondayOfISO(tISO);
-    })();
+      render();
+    }
+
+    async function enterApp(userId) {
+      cloudUserId = userId;
+      const cloud = await cloudLoad(userId);
+      if (cloud && cloud.config) {
+        // já tem dados na nuvem: essa é a fonte da verdade
+        STATE = cloud;
+        migrate(STATE);
+      } else {
+        // primeira vez: sobe o que estiver no navegador pra nuvem
+        await cloudSaveNow();
+      }
+      jumpToTodayAndRender();
+      document.getElementById("authGate").classList.add("hidden");
+    }
+
+    function traduzErroAuth(msg) {
+      msg = (msg || "").toLowerCase();
+      if (msg.includes("invalid login")) return "Email ou senha incorretos.";
+      if (msg.includes("already registered")) return "Esse email já tem conta. Entre normalmente.";
+      if (msg.includes("password should be at least")) return "A senha precisa de pelo menos 6 caracteres.";
+      if (msg.includes("unable to validate email")) return "Email inválido.";
+      if (msg.includes("email not confirmed")) return "Confirme seu email pelo link antes de entrar.";
+      return msg || "Erro ao entrar.";
+    }
+
+    function wireAuthForm() {
+      const btn = document.getElementById("authBtn");
+      const toggle = document.getElementById("authToggle");
+      const emailEl = document.getElementById("authEmail");
+      const passEl = document.getElementById("authPass");
+      const msg = document.getElementById("authMsg");
+      const sub = document.getElementById("authSub");
+      const alt = document.querySelector(".auth-alt");
+      let mode = "login";
+
+      toggle.onclick = () => {
+        mode = mode === "login" ? "signup" : "login";
+        btn.textContent = mode === "login" ? "Entrar" : "Criar conta";
+        sub.textContent = mode === "login" ? "Entre pra acessar o planejamento" : "Crie sua conta de acesso";
+        alt.childNodes[0].textContent = mode === "login" ? "Ainda não tem conta? " : "Já tem conta? ";
+        toggle.textContent = mode === "login" ? "Criar conta" : "Entrar";
+        msg.textContent = "";
+      };
+
+      async function submit() {
+        const email = emailEl.value.trim();
+        const pass = passEl.value;
+        if (!email || !pass) { msg.className = "auth-msg err"; msg.textContent = "Preencha email e senha."; return; }
+        btn.disabled = true; msg.className = "auth-msg"; msg.textContent = "Aguarde…";
+        try {
+          const res = mode === "signup"
+            ? await sb.auth.signUp({ email, password: pass })
+            : await sb.auth.signInWithPassword({ email, password: pass });
+          if (res.error) { msg.className = "auth-msg err"; msg.textContent = traduzErroAuth(res.error.message); btn.disabled = false; return; }
+          const session = res.data.session;
+          if (!session) {
+            // signup com confirmação de email ligada
+            msg.className = "auth-msg ok";
+            msg.textContent = "Conta criada! Confirme pelo link no seu email e depois entre.";
+            btn.disabled = false; mode = "login"; btn.textContent = "Entrar";
+            return;
+          }
+          await enterApp(session.user.id);
+        } catch (e) {
+          msg.className = "auth-msg err"; msg.textContent = "Erro: " + e.message; btn.disabled = false;
+        }
+      }
+      btn.onclick = submit;
+      passEl.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+    }
+
+    async function logout() {
+      try { if (sb) await sb.auth.signOut(); } catch (e) {}
+      cloudUserId = null;
+      location.reload();
+    }
+
+    /* ---------- Boot ---------- */
     bind();
-    render();
+    (async function initAuth() {
+      if (!sb) {
+        // Supabase não carregou (offline/CDN): modo local, sem login
+        document.getElementById("authGate").classList.add("hidden");
+        jumpToTodayAndRender();
+        return;
+      }
+      wireAuthForm();
+      const { data: { session } } = await sb.auth.getSession();
+      if (session && session.user) {
+        await enterApp(session.user.id);
+      }
+      // se não tem sessão, a tela de login já está visível por padrão
+    })();
   </script>
 </body>
 </html>
