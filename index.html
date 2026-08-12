@@ -114,6 +114,13 @@
     .btn:hover { border-color: var(--accent); background: #232838; }
     .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; font-weight: 600; }
     .btn.primary:hover { background: var(--accent); }
+    .btn.clickup-soon {
+      border-color: #7b68ee;
+      color: #c9c2ff;
+      background: rgba(123,104,238,.1);
+      position: relative;
+    }
+    .btn.clickup-soon:hover { border-color: #9a8cff; background: rgba(123,104,238,.18); }
     .btn.ghost { background: transparent; }
     .btn.small { padding: 5px 10px; font-size: 12px; }
     .btn.locked { border-color: var(--yellow); color: var(--yellow); background: rgba(255,207,92,.1); }
@@ -427,6 +434,7 @@
     <div class="actions">
       <button id="lockWeek" class="btn" title="Travar: marca como semana REAL e impede regerar por cima">🔓 Travar</button>
       <button id="generateBtn" class="btn primary">⚡ Gerar semana</button>
+      <button id="clickupSyncBtn" class="btn clickup-soon" title="Integração ainda não configurada — nenhuma tarefa será alterada">↻ Sincronizar tarefa do dia · Em breve</button>
       <button id="exportBtn" class="btn">📋 Exportar print</button>
       <button id="configBtn" class="btn ghost">⚙ Config</button>
     </div>
@@ -2497,6 +2505,8 @@
       };
       document.getElementById("exportBtn").onclick = () =>
         currentView === "traffic" ? exportTraffic() : exportPrint();
+      document.getElementById("clickupSyncBtn").onclick = () =>
+        toast("Integração com o ClickUp ainda não configurada. Nenhuma tarefa foi alterada.", "warn");
       document.getElementById("configBtn").onclick = openConfig;
       document.getElementById("closeConfig").onclick = closeConfig;
 
