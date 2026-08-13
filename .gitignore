@@ -5,3 +5,13 @@ ESTADO-DO-PROJETO.md
 *CONFIDENCIAL*
 *.credentials
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.json.credentials
+client_secret*.json
+service-account*.json
+supabase/.temp/

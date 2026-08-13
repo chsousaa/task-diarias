@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+if git diff --cached --no-ext-diff --unified=0 | grep -E '(sbp_[A-Za-z0-9]{20,}|pk_[0-9]+_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}|sb_secret_[A-Za-z0-9_-]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY)' >/dev/null; then
+  echo "ERRO: possível segredo detectado. Commit bloqueado."
+  exit 1
+fi

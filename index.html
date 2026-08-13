@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-TIqXow33D4oDeTLlxajnjLOwVSfJpF90uu+IAwTSJuvRQbFROROEUstIXEIKoAa/' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js" integrity="sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf" crossorigin="anonymous"></script>
   <style>
     :root {
       --bg: #0f1117;
@@ -404,7 +406,7 @@
       <input id="authEmail" type="email" placeholder="seu email" autocomplete="email" />
       <input id="authPass" type="password" placeholder="sua senha" autocomplete="current-password" />
       <button id="authBtn" class="btn primary auth-submit">Entrar</button>
-      <p class="auth-alt">Ainda não tem conta? <span id="authToggle">Criar conta</span></p>
+      <p class="auth-alt">Acesso restrito à conta autorizada.</p>
       <p class="auth-msg" id="authMsg"></p>
     </div>
   </div>
@@ -718,6 +720,17 @@
     function todayISO() {
       return _isoLocal(new Date());
     }
+    function escapeHTML(value) {
+      return String(value == null ? "" : value).replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
+    }
+    function sanitizeStateStrings(value) {
+      if (typeof value === "string") return value.replace(/[<>"'`]/g, "").replace(/javascript\s*:/gi, "").slice(0, 500);
+      if (Array.isArray(value)) return value.map(sanitizeStateStrings);
+      if (value && typeof value === "object") {
+        Object.keys(value).forEach((key) => { value[key] = sanitizeStateStrings(value[key]); });
+      }
+      return value;
+    }
 
     function todaysCopyDemands() {
       const iso = todayISO();
@@ -732,10 +745,10 @@
     }
 
     let pendingSyncPreview = null;
-    async function invokeClickupSync(action, demands) {
+    async function invokeClickupSync(action) {
       if (!sb || !cloudUserId) throw new Error("Entre na sua conta novamente.");
       const { data, error } = await sb.functions.invoke("sync-clickup-daily", {
-        body: { action, date: todayISO(), demands },
+        body: { action, date: todayISO() },
       });
       if (error) throw new Error(error.message || "Falha ao acessar a integração.");
       if (!data || data.error) throw new Error((data && data.error) || "Resposta inválida da integração.");
@@ -755,14 +768,14 @@
       confirmBtn.disabled = true;
       pendingSyncPreview = null;
       try {
-        const result = await invokeClickupSync("preview", demands);
+        const result = await invokeClickupSync("preview");
         pendingSyncPreview = result.items;
         intro.textContent = `${result.items.length} tarefa(s) pronta(s) para criar hoje.`;
-        list.innerHTML = result.items.map((item) => `<div class="sync-item"><div><strong>${item.name}</strong><br><span>${item.copy} · ${item.offer}</span></div><span>${item.exists ? "Já sincronizada" : "Nova tarefa"}</span></div>`).join("");
+        list.innerHTML = result.items.map((item) => `<div class="sync-item"><div><strong>${escapeHTML(item.name)}</strong><br><span>${escapeHTML(item.copy)} · ${escapeHTML(item.offer)}</span></div><span>${item.exists ? "Já sincronizada" : "Nova tarefa"}</span></div>`).join("");
         confirmBtn.disabled = !result.items.some((x) => !x.exists);
       } catch (err) {
         intro.textContent = "Não foi possível preparar a sincronização.";
-        list.innerHTML = `<div class="sync-item"><span>${String(err.message || err)}</span></div>`;
+        list.innerHTML = `<div class="sync-item"><span>${escapeHTML(err.message || err)}</span></div>`;
       }
     }
     function shuffle(a) {
@@ -816,6 +829,7 @@
       return s;
     }
     function migrate(s) {
+      sanitizeStateStrings(s);
       const taken = [];
       const copyPalette = ["#4d9bff", "#b96bff", "#ff6bb3", "#5cffd6", "#ffd166", "#8aff5c"];
       (s.config.copyTeam || []).forEach((p, i) => {
@@ -910,7 +924,9 @@
       s.weeks[-1] = { num: -1, meta: {}, copy: {}, edit: {}, carryOut: [{ uid: "doc-s5-pacu", id: "PACU-MA (doc S5)", offer: "PACU", gordura: true }] };
     }
     function save() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(STATE)); } catch (e) {}
+      // Depois do login, a nuvem é a fonte da verdade. Não deixa o planejamento
+      // persistido no dispositivo compartilhado.
+      if (!cloudUserId) try { localStorage.setItem(STORE_KEY, JSON.stringify(STATE)); } catch (e) {}
       scheduleCloudSave(); // também sincroniza pra nuvem (se logado)
     }
 
@@ -2576,7 +2592,7 @@
         if (!pendingSyncPreview) return;
         btn.disabled = true; btn.textContent = "Criando…";
         try {
-          const result = await invokeClickupSync("create", todaysCopyDemands());
+          const result = await invokeClickupSync("create");
           document.getElementById("syncModal").classList.add("hidden");
           toast(`${result.created} tarefa(s) criada(s); ${result.skipped} já existia(m).`, "ok");
         } catch (err) {
@@ -2755,8 +2771,13 @@
        ============================================================ */
     const SB_URL = "https://vdotdblluwfogjmdjlob.supabase.co";
     const SB_PUBLISHABLE = "sb_publishable_7pP6IIDLZzdQtIgQJoIpZw_SKT1smZ0";
+    const SB_AUTH_STORE_KEY = "sb-vdotdblluwfogjmdjlob-auth-token";
     try {
-      if (window.supabase) sb = window.supabase.createClient(SB_URL, SB_PUBLISHABLE);
+      // Remove o token legado que versões anteriores deixavam persistido no disco.
+      localStorage.removeItem(SB_AUTH_STORE_KEY);
+      if (window.supabase) sb = window.supabase.createClient(SB_URL, SB_PUBLISHABLE, {
+        auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      });
     } catch (e) { console.warn("Supabase indisponível:", e); }
 
     async function cloudLoad(userId) {
@@ -2805,6 +2826,7 @@
         // primeira vez: sobe o que estiver no navegador pra nuvem
         await cloudSaveNow();
       }
+      localStorage.removeItem(STORE_KEY);
       jumpToTodayAndRender();
       document.getElementById("authGate").classList.add("hidden");
     }
@@ -2813,7 +2835,7 @@
       msg = (msg || "").toLowerCase();
       if (msg.includes("invalid login")) return "Email ou senha incorretos.";
       if (msg.includes("already registered")) return "Esse email já tem conta. Entre normalmente.";
-      if (msg.includes("password should be at least")) return "A senha precisa de pelo menos 6 caracteres.";
+      if (msg.includes("password should be at least")) return "A senha não atende aos requisitos de segurança.";
       if (msg.includes("unable to validate email")) return "Email inválido.";
       if (msg.includes("email not confirmed")) return "Confirme seu email pelo link antes de entrar.";
       return msg || "Erro ao entrar.";
@@ -2821,22 +2843,10 @@
 
     function wireAuthForm() {
       const btn = document.getElementById("authBtn");
-      const toggle = document.getElementById("authToggle");
       const emailEl = document.getElementById("authEmail");
       const passEl = document.getElementById("authPass");
       const msg = document.getElementById("authMsg");
       const sub = document.getElementById("authSub");
-      const alt = document.querySelector(".auth-alt");
-      let mode = "login";
-
-      toggle.onclick = () => {
-        mode = mode === "login" ? "signup" : "login";
-        btn.textContent = mode === "login" ? "Entrar" : "Criar conta";
-        sub.textContent = mode === "login" ? "Entre pra acessar o planejamento" : "Crie sua conta de acesso";
-        alt.childNodes[0].textContent = mode === "login" ? "Ainda não tem conta? " : "Já tem conta? ";
-        toggle.textContent = mode === "login" ? "Criar conta" : "Entrar";
-        msg.textContent = "";
-      };
 
       async function submit() {
         if (!sb) { msg.className = "auth-msg err"; msg.textContent = "Sem conexão com o servidor. Recarregue a página."; return; }
@@ -2845,18 +2855,10 @@
         if (!email || !pass) { msg.className = "auth-msg err"; msg.textContent = "Preencha email e senha."; return; }
         btn.disabled = true; msg.className = "auth-msg"; msg.textContent = "Aguarde…";
         try {
-          const res = mode === "signup"
-            ? await sb.auth.signUp({ email, password: pass })
-            : await sb.auth.signInWithPassword({ email, password: pass });
+          const res = await sb.auth.signInWithPassword({ email, password: pass });
           if (res.error) { msg.className = "auth-msg err"; msg.textContent = traduzErroAuth(res.error.message); btn.disabled = false; return; }
           const session = res.data.session;
-          if (!session) {
-            // signup com confirmação de email ligada
-            msg.className = "auth-msg ok";
-            msg.textContent = "Conta criada! Confirme pelo link no seu email e depois entre.";
-            btn.disabled = false; mode = "login"; btn.textContent = "Entrar";
-            return;
-          }
+          if (!session) throw new Error("Sessão não criada.");
           await enterApp(session.user.id);
         } catch (e) {
           msg.className = "auth-msg err"; msg.textContent = "Erro: " + e.message; btn.disabled = false;
@@ -2869,6 +2871,9 @@
     async function logout() {
       try { if (sb) await sb.auth.signOut(); } catch (e) {}
       cloudUserId = null;
+      localStorage.removeItem(STORE_KEY);
+      localStorage.removeItem(SB_AUTH_STORE_KEY);
+      sessionStorage.removeItem(SB_AUTH_STORE_KEY);
       location.reload();
     }
 
@@ -2879,9 +2884,10 @@
     wireAuthForm();
     (async function initAuth() {
       if (!sb) {
-        // Supabase não carregou (offline/CDN): modo local, sem login
-        document.getElementById("authGate").classList.add("hidden");
-        jumpToTodayAndRender();
+        // Falha fechada: sem autenticação, nenhum dado é exibido.
+        const msg = document.getElementById("authMsg");
+        msg.className = "auth-msg err";
+        msg.textContent = "Servidor de autenticação indisponível. Recarregue a página.";
         return;
       }
       const { data: { session } } = await sb.auth.getSession();
