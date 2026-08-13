@@ -1,0 +1,4 @@
+project_id = "vdotdblluwfogjmdjlob"
+
+[functions.sync-clickup-daily]
+verify_jwt = true

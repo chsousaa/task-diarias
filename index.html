@@ -121,6 +121,12 @@
       position: relative;
     }
     .btn.clickup-soon:hover { border-color: #9a8cff; background: rgba(123,104,238,.18); }
+    .btn.clickup-soon.busy { opacity: .65; pointer-events: none; }
+    .sync-list { display: grid; gap: 9px; margin: 14px 0 18px; }
+    .sync-item { display:flex; justify-content:space-between; gap:12px; padding:11px 12px; border:1px solid var(--line); border-radius:9px; background:var(--bg-3); }
+    .sync-item strong { font-size:13px; }
+    .sync-item span { color:var(--muted); font-size:12px; }
+    .sync-note { color:var(--muted); font-size:12px; line-height:1.5; }
     .btn.ghost { background: transparent; }
     .btn.small { padding: 5px 10px; font-size: 12px; }
     .btn.locked { border-color: var(--yellow); color: var(--yellow); background: rgba(255,207,92,.1); }
@@ -434,7 +440,7 @@
     <div class="actions">
       <button id="lockWeek" class="btn" title="Travar: marca como semana REAL e impede regerar por cima">🔓 Travar</button>
       <button id="generateBtn" class="btn primary">⚡ Gerar semana</button>
-      <button id="clickupSyncBtn" class="btn clickup-soon" title="Integração ainda não configurada — nenhuma tarefa será alterada">↻ Sincronizar tarefa do dia · Em breve</button>
+      <button id="clickupSyncBtn" class="btn clickup-soon" title="Preparar as tarefas de copy do dia para o ClickUp">↻ Sincronizar tarefas do dia</button>
       <button id="exportBtn" class="btn">📋 Exportar print</button>
       <button id="configBtn" class="btn ghost">⚙ Config</button>
     </div>
@@ -582,6 +588,16 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <div id="syncModal" class="modal hidden">
+    <div class="modal-box" style="max-width:600px">
+      <div class="modal-head"><h2>Sincronizar com o ClickUp</h2><button id="closeSync" class="icon-btn">✕</button></div>
+      <p class="sync-note" id="syncIntro">Conferindo as demandas de copy e a numeração no Google Drive…</p>
+      <div id="syncList" class="sync-list"></div>
+      <p class="sync-note">Somente tarefas dos copys serão criadas. O Google Drive será consultado em modo de leitura.</p>
+      <div class="modal-actions"><button id="cancelSync" class="btn">Cancelar</button><button id="confirmSync" class="btn primary" disabled>Criar tarefas no ClickUp</button></div>
+    </div>
+  </div>
+
   <script>
     /* ============================================================
        TASK DIÁRIAS — planejamento semanal de criativos
@@ -701,6 +717,53 @@
     }
     function todayISO() {
       return _isoLocal(new Date());
+    }
+
+    function todaysCopyDemands() {
+      const iso = todayISO();
+      const found = findOpWeek(iso);
+      const col = offToColKey(found.off);
+      const week = STATE.weeks[found.num];
+      if (!week || !col) return [];
+      return STATE.config.copyTeam.filter((p) => p.active).flatMap((p) => {
+        const card = week.copy && week.copy[p.name] && week.copy[p.name][col];
+        return card ? [{ copy: p.name, copyCode: p.sigla, offer: card.offer, date: iso, cardUid: card.uid }] : [];
+      });
+    }
+
+    let pendingSyncPreview = null;
+    async function invokeClickupSync(action, demands) {
+      if (!sb || !cloudUserId) throw new Error("Entre na sua conta novamente.");
+      const { data, error } = await sb.functions.invoke("sync-clickup-daily", {
+        body: { action, date: todayISO(), demands },
+      });
+      if (error) throw new Error(error.message || "Falha ao acessar a integração.");
+      if (!data || data.error) throw new Error((data && data.error) || "Resposta inválida da integração.");
+      return data;
+    }
+
+    async function openSyncPreview() {
+      const demands = todaysCopyDemands();
+      if (!demands.length) { toast("Não há demandas de copy planejadas para hoje.", "warn"); return; }
+      const modal = document.getElementById("syncModal");
+      const intro = document.getElementById("syncIntro");
+      const list = document.getElementById("syncList");
+      const confirmBtn = document.getElementById("confirmSync");
+      modal.classList.remove("hidden");
+      intro.textContent = "Conferindo as demandas de copy e a numeração no Google Drive…";
+      list.innerHTML = "";
+      confirmBtn.disabled = true;
+      pendingSyncPreview = null;
+      try {
+        const result = await invokeClickupSync("preview", demands);
+        pendingSyncPreview = result.items;
+        intro.textContent = `${result.items.length} tarefa(s) pronta(s) para criar hoje.`;
+        list.innerHTML = result.items.map((item) => `<div class="sync-item"><div><strong>${item.name}</strong><br><span>${item.copy} · ${item.offer}</span></div><span>${item.exists ? "Já sincronizada" : "Nova tarefa"}</span></div>`).join("");
+        confirmBtn.disabled = !result.items.some((x) => !x.exists);
+      } catch (err) {
+        intro.textContent = "Não foi possível preparar a sincronização.";
+        list.innerHTML = `<div class="sync-item"><span>${String(err.message || err)}</span></div>`;
+      }
     }
     function shuffle(a) {
       for (let i = a.length - 1; i > 0; i--) {
@@ -2505,8 +2568,22 @@
       };
       document.getElementById("exportBtn").onclick = () =>
         currentView === "traffic" ? exportTraffic() : exportPrint();
-      document.getElementById("clickupSyncBtn").onclick = () =>
-        toast("Integração com o ClickUp ainda não configurada. Nenhuma tarefa foi alterada.", "warn");
+      document.getElementById("clickupSyncBtn").onclick = openSyncPreview;
+      document.getElementById("closeSync").onclick = () => document.getElementById("syncModal").classList.add("hidden");
+      document.getElementById("cancelSync").onclick = () => document.getElementById("syncModal").classList.add("hidden");
+      document.getElementById("confirmSync").onclick = async () => {
+        const btn = document.getElementById("confirmSync");
+        if (!pendingSyncPreview) return;
+        btn.disabled = true; btn.textContent = "Criando…";
+        try {
+          const result = await invokeClickupSync("create", todaysCopyDemands());
+          document.getElementById("syncModal").classList.add("hidden");
+          toast(`${result.created} tarefa(s) criada(s); ${result.skipped} já existia(m).`, "ok");
+        } catch (err) {
+          toast(err.message || "Falha ao criar tarefas.", "err");
+          btn.disabled = false;
+        } finally { btn.textContent = "Criar tarefas no ClickUp"; }
+      };
       document.getElementById("configBtn").onclick = openConfig;
       document.getElementById("closeConfig").onclick = closeConfig;
 
