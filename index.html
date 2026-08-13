@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-KFLBGIsFCoQMeVmhj5g9dqIcVakOzWx6DhulMfWDSy8opg40kp7hpghRkm+lPJIN' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-qBYC6PuSkQMcv5/2Cyi+F/Xicaxy1EM6LMPKOUAwRhbni2VKZ8Av2N3wSnzsLDou' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -75,6 +75,9 @@
     .auth-msg { font-size: 12px; margin: 12px 0 0; min-height: 16px; }
     .auth-msg.err { color: var(--red); }
     .auth-msg.ok { color: var(--green); }
+    .access-list { display:grid; gap:8px; margin-top:10px; }
+    .access-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg-3); }
+    .access-row span { font-size:12px; overflow-wrap:anywhere; }
 
     /* ===== Topbar ===== */
     .topbar {
@@ -406,7 +409,7 @@
       <input id="authEmail" type="email" placeholder="seu email" autocomplete="email" />
       <input id="authPass" type="password" placeholder="sua senha" autocomplete="current-password" />
       <button id="authBtn" class="btn primary auth-submit">Entrar</button>
-      <p class="auth-alt">Acesso restrito à conta autorizada.</p>
+      <p class="auth-alt" id="authAlt">Acesso restrito. <a id="inviteLink" href="?invite=1" style="color:var(--accent)">Solicitar acesso</a></p>
       <p class="auth-msg" id="authMsg"></p>
     </div>
   </div>
@@ -579,6 +582,12 @@
           <span id="acctEmail">—</span> · dados sincronizados na nuvem 🔒
         </p>
         <button id="logoutBtn" class="btn small">🚪 Sair da conta</button>
+        <div id="accessAdmin" class="hidden">
+          <hr />
+          <h3>🔔 Solicitações de acesso <span id="accessCount"></span></h3>
+          <div id="accessList" class="access-list"></div>
+          <button id="copyInviteLink" class="btn small" style="margin-top:10px">🔗 Copiar link de convite</button>
+        </div>
       </div>
 
       <div class="modal-foot">
@@ -611,7 +620,8 @@
 
     const STORE_KEY = "task_diarias_v1";
     // nuvem/login (inicializados no boot; declarados aqui p/ evitar TDZ no save())
-    let sb = null, cloudUserId = null, cloudSaveTimer = null;
+    let sb = null, cloudUserId = null, cloudStateOwnerId = null, cloudIsOwner = false, cloudSaveTimer = null;
+    const OWNER_ID = "551c0e6f-5dfd-4d02-b8b4-18f19fcec28b";
 
     /* ---------- Calendário das grades ----------
        COPY: semana começa QUI (defasagem). SÁB/DOM folga.
@@ -2307,6 +2317,7 @@
         }
       }
       document.getElementById("configModal").classList.remove("hidden");
+      renderAccessRequests();
     }
 
     /* Grade editável: último nº de ad por copy × oferta */
@@ -2775,6 +2786,12 @@
       if (logoutEl) logoutEl.onclick = () => {
         if (confirm("Sair da conta? Você vai precisar entrar de novo.")) logout();
       };
+      const copyInvite = document.getElementById("copyInviteLink");
+      if (copyInvite) copyInvite.onclick = async () => {
+        const url = `${location.origin}${location.pathname}?invite=1`;
+        await navigator.clipboard.writeText(url);
+        toast("Link de convite copiado.", "ok");
+      };
 
       document.getElementById("configModal").addEventListener("click", (e) => {
         if (e.target.id === "configModal") closeConfig();
@@ -2805,12 +2822,13 @@
       } catch (e) { console.warn("cloudLoad ex", e); return null; }
     }
     async function cloudSaveNow() {
-      if (!sb || !cloudUserId) return;
+      if (!sb || !cloudUserId || !cloudStateOwnerId) return;
       try {
-        const { error } = await sb.from("app_state").upsert(
-          { user_id: cloudUserId, data: STATE, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" }
-        );
+        const payload = { data: STATE, updated_at: new Date().toISOString() };
+        const query = cloudIsOwner
+          ? sb.from("app_state").upsert({ user_id: cloudStateOwnerId, ...payload }, { onConflict: "user_id" })
+          : sb.from("app_state").update(payload).eq("user_id", cloudStateOwnerId);
+        const { error } = await query;
         if (error) console.warn("cloudSave", error);
       } catch (e) { console.warn("cloudSave ex", e); }
     }
@@ -2832,7 +2850,21 @@
 
     async function enterApp(userId) {
       cloudUserId = userId;
-      const cloud = await cloudLoad(userId);
+      cloudIsOwner = userId === OWNER_ID;
+      cloudStateOwnerId = cloudIsOwner ? userId : null;
+      if (!cloudIsOwner) {
+        const { data: membership } = await sb.from("team_members").select("owner_id,role").eq("user_id", userId).maybeSingle();
+        if (!membership) {
+          const msg = document.getElementById("authMsg");
+          msg.className = "auth-msg ok";
+          msg.textContent = "Cadastro recebido. Aguarde o administrador aprovar seu acesso.";
+          await sb.auth.signOut();
+          cloudUserId = null;
+          return;
+        }
+        cloudStateOwnerId = membership.owner_id;
+      }
+      const cloud = await cloudLoad(cloudStateOwnerId);
       if (cloud && cloud.config) {
         // já tem dados na nuvem: essa é a fonte da verdade
         STATE = cloud;
@@ -2844,6 +2876,24 @@
       localStorage.removeItem(STORE_KEY);
       jumpToTodayAndRender();
       document.getElementById("authGate").classList.add("hidden");
+      document.getElementById("clickupSyncBtn").classList.toggle("hidden", !cloudIsOwner);
+    }
+
+    async function renderAccessRequests() {
+      const admin = document.getElementById("accessAdmin");
+      if (!cloudIsOwner) { admin.classList.add("hidden"); return; }
+      admin.classList.remove("hidden");
+      const { data } = await sb.from("access_requests").select("user_id,email,requested_at").eq("status","pending").order("requested_at");
+      const list = document.getElementById("accessList");
+      document.getElementById("accessCount").textContent = data?.length ? `(${data.length})` : "";
+      list.innerHTML = data?.length ? data.map((r) => `<div class="access-row"><span>${escapeHTML(r.email)}</span><div><button class="btn small primary" data-approve="${r.user_id}">Aprovar</button> <button class="btn small danger" data-reject="${r.user_id}">Recusar</button></div></div>`).join("") : '<span class="muted">Nenhuma solicitação pendente.</span>';
+      list.querySelectorAll("[data-approve],[data-reject]").forEach((btn) => btn.onclick = async () => {
+        const id = btn.dataset.approve || btn.dataset.reject;
+        const status = btn.dataset.approve ? "approved" : "rejected";
+        btn.disabled = true;
+        const { error } = await sb.from("access_requests").update({ status }).eq("user_id", id);
+        if (error) toast("Não foi possível atualizar o acesso.", "err"); else { toast(status === "approved" ? "Acesso aprovado." : "Acesso recusado.", "ok"); renderAccessRequests(); }
+      });
     }
 
     function traduzErroAuth(msg) {
@@ -2862,6 +2912,14 @@
       const passEl = document.getElementById("authPass");
       const msg = document.getElementById("authMsg");
       const sub = document.getElementById("authSub");
+      const inviteMode = new URLSearchParams(location.search).get("invite") === "1";
+      if (inviteMode) {
+        btn.textContent = "Solicitar acesso";
+        sub.textContent = "Crie sua senha e aguarde a aprovação";
+        document.getElementById("authAlt").innerHTML = 'Já tem acesso? <a href="./" style="color:var(--accent)">Entrar</a>';
+        emailEl.autocomplete = "email";
+        passEl.autocomplete = "new-password";
+      }
 
       async function submit() {
         if (!sb) { msg.className = "auth-msg err"; msg.textContent = "Sem conexão com o servidor. Recarregue a página."; return; }
@@ -2870,8 +2928,16 @@
         if (!email || !pass) { msg.className = "auth-msg err"; msg.textContent = "Preencha email e senha."; return; }
         btn.disabled = true; msg.className = "auth-msg"; msg.textContent = "Aguarde…";
         try {
-          const res = await sb.auth.signInWithPassword({ email, password: pass });
+          const res = inviteMode
+            ? await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: `${location.origin}${location.pathname}` } })
+            : await sb.auth.signInWithPassword({ email, password: pass });
           if (res.error) { msg.className = "auth-msg err"; msg.textContent = traduzErroAuth(res.error.message); btn.disabled = false; return; }
+          if (inviteMode && !res.data.session) {
+            msg.className = "auth-msg ok";
+            msg.textContent = "Solicitação recebida. Confirme seu e-mail e aguarde a aprovação do administrador.";
+            btn.disabled = false;
+            return;
+          }
           const session = res.data.session;
           if (!session) throw new Error("Sessão não criada.");
           await enterApp(session.user.id);
