@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-gij8tLEpDX2zxa4vQRi2wF2s6ZbAADNpmcnTUR5pMRKVjnOIwA4R4ZIAm06xJrGO' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-oh4cYWj/3nu1N3EYe0MYrucTS0oLFhD/Hv96uRQKj8vwCt75or7It1E/HTZi0fFy' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -64,6 +64,9 @@
       background: var(--bg-3); border: 1px solid var(--line); border-radius: 9px; color: var(--text);
     }
     .auth-box input:focus { outline: none; border-color: var(--accent); }
+    .remember-row { display:flex; align-items:center; gap:8px; margin:0 0 14px; color:var(--muted); font-size:12px; text-align:left; cursor:pointer; }
+    .remember-row input { width:auto; margin:0; accent-color:var(--accent); }
+    .remember-row small { display:block; color:#697185; font-size:10px; margin-top:2px; }
     .auth-submit { width: 100%; padding: 12px; font-size: 15px; margin-top: 4px; }
     .auth-alt { color: var(--muted); font-size: 13px; margin: 18px 0 0; }
     .auth-alt span {
@@ -434,6 +437,7 @@
       <p class="auth-sub" id="authSub">Entre pra acessar o planejamento</p>
       <input id="authEmail" type="email" placeholder="seu email" autocomplete="email" />
       <input id="authPass" type="password" placeholder="sua senha" autocomplete="current-password" />
+      <label id="rememberRow" class="remember-row"><input id="authRemember" type="checkbox" /><span>Manter conectado neste dispositivo<small>Use somente em um computador pessoal.</small></span></label>
       <button id="authBtn" class="btn primary auth-submit">Entrar</button>
       <p class="auth-alt" id="authAlt">Acesso restrito. <a id="inviteLink" href="?invite=1" style="color:var(--accent)">Solicitar acesso</a></p>
       <p class="auth-msg" id="authMsg"></p>
@@ -2912,11 +2916,26 @@
     const SB_URL = "https://vdotdblluwfogjmdjlob.supabase.co";
     const SB_PUBLISHABLE = "sb_publishable_7pP6IIDLZzdQtIgQJoIpZw_SKT1smZ0";
     const SB_AUTH_STORE_KEY = "sb-vdotdblluwfogjmdjlob-auth-token";
+    const SB_REMEMBER_KEY = "task-diarias-remember-session";
     try {
-      // Remove o token legado que versões anteriores deixavam persistido no disco.
-      localStorage.removeItem(SB_AUTH_STORE_KEY);
+      // O armazenamento é escolhido pelo usuário no login. A opção padrão usa
+      // sessionStorage e termina ao fechar o navegador; "manter conectado" usa
+      // localStorage apenas neste dispositivo.
+      const authStorage = {
+        getItem(key) {
+          const persistent = localStorage.getItem(SB_REMEMBER_KEY) === "1";
+          return (persistent ? localStorage : sessionStorage).getItem(key);
+        },
+        setItem(key, value) {
+          const persistent = localStorage.getItem(SB_REMEMBER_KEY) === "1";
+          const target = persistent ? localStorage : sessionStorage;
+          const other = persistent ? sessionStorage : localStorage;
+          target.setItem(key, value); other.removeItem(key);
+        },
+        removeItem(key) { localStorage.removeItem(key); sessionStorage.removeItem(key); },
+      };
       if (window.supabase) sb = window.supabase.createClient(SB_URL, SB_PUBLISHABLE, {
-        auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+        auth: { storage: authStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
       });
     } catch (e) { console.warn("Supabase indisponível:", e); }
 
@@ -3024,6 +3043,7 @@
       const btn = document.getElementById("authBtn");
       const emailEl = document.getElementById("authEmail");
       const passEl = document.getElementById("authPass");
+      const rememberEl = document.getElementById("authRemember");
       const msg = document.getElementById("authMsg");
       const sub = document.getElementById("authSub");
       const inviteMode = new URLSearchParams(location.search).get("invite") === "1";
@@ -3033,6 +3053,7 @@
         document.getElementById("authAlt").innerHTML = 'Já tem acesso? <a href="./" style="color:var(--accent)">Entrar</a>';
         emailEl.autocomplete = "email";
         passEl.autocomplete = "new-password";
+        document.getElementById("rememberRow").classList.add("hidden");
       }
 
       async function submit() {
@@ -3042,6 +3063,7 @@
         if (!email || !pass) { msg.className = "auth-msg err"; msg.textContent = "Preencha email e senha."; return; }
         btn.disabled = true; msg.className = "auth-msg"; msg.textContent = "Aguarde…";
         try {
+          if (!inviteMode) localStorage.setItem(SB_REMEMBER_KEY, rememberEl.checked ? "1" : "0");
           const res = inviteMode
             ? await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: `${location.origin}${location.pathname}` } })
             : await sb.auth.signInWithPassword({ email, password: pass });
@@ -3069,6 +3091,7 @@
       localStorage.removeItem(STORE_KEY);
       localStorage.removeItem(SB_AUTH_STORE_KEY);
       sessionStorage.removeItem(SB_AUTH_STORE_KEY);
+      localStorage.removeItem(SB_REMEMBER_KEY);
       location.reload();
     }
 
