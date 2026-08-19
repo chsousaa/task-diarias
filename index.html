@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-/0rT7r/b67nvnsDeGhTRtaarGoWHfD9CehPm+XeX0j6ODoLRJSKH+U8Y/QJsuzk+' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-2f2igsVQ6Tmj757DXbhb6guFMVTUbyvlfwN0yMWigLX8Wg0aR89l/j/aAfb7swxG' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -178,6 +178,25 @@
     .meta-chip.total.ok { border-color: var(--green); }
     .meta-chip.total.bad { border-color: var(--yellow); }
     .meta-empty { color: var(--muted); padding: 6px; }
+
+    /* ===== Saúde da produção ===== */
+    .health-panel { margin: 14px 22px 0; padding: 14px 16px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; }
+    .health-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .health-head h2 { margin:0; font-size:15px; }
+    .health-head p { margin:3px 0 0; color:var(--muted); font-size:11px; }
+    .health-actions { display:flex; align-items:center; gap:9px; }
+    .health-summary { display:grid; grid-template-columns:repeat(5,minmax(100px,1fr)); gap:8px; margin-bottom:10px; }
+    .health-stat { background:var(--bg-3); border:1px solid var(--line); border-radius:9px; padding:9px 11px; }
+    .health-stat b { display:block; font-size:20px; line-height:1; margin-bottom:4px; }
+    .health-stat small { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.3px; }
+    .health-stat.ok b { color:var(--green); } .health-stat.warn b { color:var(--yellow); } .health-stat.late b { color:var(--red); }
+    .health-list { display:grid; gap:6px; }
+    .health-row { display:grid; grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) auto auto; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; }
+    .health-row.overdue,.health-row.delivered_late { border-left-color:var(--red); } .health-row.due_today { border-left-color:var(--yellow); } .health-row.delivered_on_time { border-left-color:var(--green); } .health-row.not_found { border-left-color:var(--muted); }
+    .health-row strong { font-size:12px; } .health-row .muted { font-size:11px; }
+    .health-badge { border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700; background:var(--bg-3); white-space:nowrap; }
+    .health-badge.overdue,.health-badge.delivered_late { color:var(--red); } .health-badge.due_today { color:var(--yellow); } .health-badge.delivered_on_time { color:var(--green); }
+    @media (max-width: 800px) { .health-summary { grid-template-columns:repeat(2,1fr); } .health-row { grid-template-columns:1fr auto; } .health-row .health-current { display:none; } }
 
     /* ===== Boards ===== */
     .boards { padding: 18px 22px 8px; display: flex; flex-direction: column; gap: 22px; }
@@ -453,6 +472,15 @@
 
   <!-- Quantidades por oferta + contadores -->
   <section id="metaBar" class="meta-bar"></section>
+
+  <section id="healthPanel" class="health-panel hidden" aria-live="polite">
+    <div class="health-head">
+      <div><h2>Saúde da produção</h2><p id="healthChecked">Monitoramento automático das entregas na Revisão de edição.</p></div>
+      <div class="health-actions"><button id="refreshHealth" class="btn small">↻ Atualizar</button></div>
+    </div>
+    <div id="healthSummary" class="health-summary"></div>
+    <div id="healthList" class="health-list"><span class="muted">Carregando andamento…</span></div>
+  </section>
 
   <main id="boards" class="boards">
     <!-- COPY -->
@@ -779,6 +807,50 @@
       if (!response.ok) throw new Error((data && (data.error || data.message)) || `Falha do servidor (${response.status}).`);
       if (!data || data.error) throw new Error((data && data.error) || "Resposta inválida da integração.");
       return data;
+    }
+
+    async function invokeProductionHealth() {
+      if (!sb || !cloudUserId) throw new Error("Entre na sua conta novamente.");
+      const { data: { session }, error: sessionError } = await sb.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error("Sessão expirada. Entre novamente.");
+      const response = await fetch(`${SB_URL}/functions/v1/production-health`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SB_PUBLISHABLE, Authorization: `Bearer ${session.access_token}`, "X-Client-Info": "task-diarias/1.0" },
+        body: "{}",
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data || data.error) throw new Error((data && data.error) || `Falha do servidor (${response.status}).`);
+      return data;
+    }
+
+    function healthDateTime(value) {
+      if (!value) return "—";
+      return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Fortaleza", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+    }
+    function renderProductionHealth(data) {
+      const labels = { delivered_on_time: "Entregue no prazo", delivered_late: "Entregue com atraso", due_today: "Entrega hoje", overdue: "Atrasado", in_progress: "Em andamento", not_found: "Não localizado" };
+      document.getElementById("healthChecked").textContent = `Conferido às ${healthDateTime(data.checkedAt)} · prazo diário às 09:30`;
+      const s = data.summary;
+      document.getElementById("healthSummary").innerHTML = [
+        [s.deliveredOnTime,"No prazo","ok"], [s.dueToday,"Vencem hoje","warn"], [s.overdue,"Atrasadas","late"], [s.deliveredLate,"Entregues tarde","late"], [s.notFound,"Não localizadas",""]
+      ].map(([n,l,c]) => `<div class="health-stat ${c}"><b>${n}</b><small>${l}</small></div>`).join("");
+      document.getElementById("healthList").innerHTML = data.items.map((item) => {
+        const due = healthDateTime(item.deadline);
+        const delivered = item.deliveredAt ? `Entregue ${healthDateTime(item.deliveredAt)}` : `Prazo ${due}`;
+        const seq = item.sequence >= 2 ? "leva 2 · dupla" : "leva 1";
+        return `<div class="health-row ${escapeHTML(item.health)}"><div><strong>${escapeHTML(item.editor)} · ${escapeHTML(item.copyCode)}-${escapeHTML(item.offer)}</strong><div class="muted">${seq} · recebida ${fmtBR(item.assignedDate)}</div></div><div class="health-current"><span class="muted">${escapeHTML(item.currentStatus || "Tarefa não localizada")}</span></div><span>${escapeHTML(delivered)}</span><span class="health-badge ${escapeHTML(item.health)}">${escapeHTML(labels[item.health] || item.health)}</span></div>`;
+      }).join("") || '<span class="muted">Nenhuma demanda de edição nesta semana.</span>';
+    }
+    let healthTimer = null;
+    async function loadProductionHealth(showError = false) {
+      if (!cloudIsOwner) return;
+      const btn = document.getElementById("refreshHealth");
+      btn.disabled = true;
+      try { renderProductionHealth(await invokeProductionHealth()); }
+      catch (err) {
+        document.getElementById("healthList").innerHTML = `<span class="muted">${escapeHTML(err.message || err)}</span>`;
+        if (showError) toast("Não foi possível atualizar a saúde da produção.", "err");
+      } finally { btn.disabled = false; }
     }
 
     async function openSyncPreview() {
@@ -2573,6 +2645,7 @@
       currentView = view;
       const isPlan = view === "plan";
       document.getElementById("metaBar").classList.toggle("hidden", !isPlan);
+      document.getElementById("healthPanel").classList.toggle("hidden", !isPlan || !cloudIsOwner);
       document.getElementById("boards").classList.toggle("hidden", !isPlan);
       document.getElementById("trafficView").classList.toggle("hidden", isPlan);
       // botões de ação que só fazem sentido no planejamento
@@ -2587,6 +2660,7 @@
        EVENTOS
        ============================================================ */
     function bind() {
+      document.getElementById("refreshHealth").onclick = () => loadProductionHealth(true);
       document.getElementById("lockWeek").onclick = () => {
         const week = ensureWeek(STATE, STATE.current);
         if (week.locked) {
@@ -2889,6 +2963,12 @@
       jumpToTodayAndRender();
       document.getElementById("authGate").classList.add("hidden");
       document.getElementById("clickupSyncBtn").classList.toggle("hidden", !cloudIsOwner);
+      document.getElementById("healthPanel").classList.toggle("hidden", !cloudIsOwner || currentView !== "plan");
+      clearInterval(healthTimer);
+      if (cloudIsOwner) {
+        await loadProductionHealth();
+        healthTimer = setInterval(() => loadProductionHealth(), 5 * 60 * 1000);
+      }
     }
 
     async function renderAccessRequests() {
