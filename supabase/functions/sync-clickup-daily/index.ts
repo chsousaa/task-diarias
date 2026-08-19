@@ -4,19 +4,14 @@ const DRIVE_FOLDERS: Record<string, Record<string, string>> = {
   PACU: { CA: "1GKNIiUNm-AMr2C7WwDx6iq64tA_ZaNcd", CL: "1eFLY1mUt80TbzuCncqBdETzpcHoohYjx", RA: "1Ovsq9e2v59qvNxBVvYL9V1tyKek3Bth3" },
   OTIT: { CA: "18Ox6AlaXHg-TsqQxH4PAgBQAidT_AiA7", CL: "1t7T5vWPguWz-OJpF_AI-1hEt2Mo0HehT", RA: "13NfYDhg5AWYZxw66Hogxh8bSTdrtOF59" },
   OTIG: { CA: "1Yb6I4hi7jCnZBCjkfK3sUGq9IrY5gC--", CL: "1ZcdXPjubjKwu-eqnQJZAXsw4juKBU0Hr", RA: "1JeOgZx1uNzBofR22R8KtrJuvewURHFan" },
+  PESD: { CA: "115G-_LBrpK9pt-n0j6e3GyiEP1I6s5e0", CL: "1nD0RAo_JSuu-_13qRsMJmDEC401TG19y", RA: "1e0xCSIUqeByXszEdYPnjSBrUpw5ximT0" },
 };
-const NEW_OFFERS_WITHOUT_DRIVE = new Set(["PESD"]);
 
 const cors = { "Access-Control-Allow-Origin": "https://chsousaa.github.io", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Content-Type": "application/json" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
 
 async function nextRange(apiKey: string, offer: string, copyCode: string, reservedMax = 0) {
   const folder = DRIVE_FOLDERS[offer]?.[copyCode];
-  // Ofertas recém-lançadas começam em 1–5 por copy e avançam pelas reservas
-  // do servidor até ganharem uma pasta própria no Drive.
-  if (!folder && NEW_OFFERS_WITHOUT_DRIVE.has(offer)) {
-    return { start: reservedMax + 1, end: reservedMax + 5, source: "server" };
-  }
   if (!folder) throw new Error(`Pasta não configurada: ${copyCode}-${offer}`);
   const q = encodeURIComponent(`'${folder}' in parents and trashed = false`);
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(name)&pageSize=1000`, { headers: { "x-goog-api-key": apiKey } });
