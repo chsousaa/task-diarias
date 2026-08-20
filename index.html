@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-bRnroTdXEpq6DJ73yPDzQjuMvpVZ9gsryC9+tGDWgew8vU5wVriiiGagNJeo3mcR' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-yTXaloCwP1sUvufn89wlckDhGNdhrXEq1LhDFzb87eiviuUEb4xE/Nql0kAWy2Ok' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -239,6 +239,16 @@
     .grid .head.today { background: rgba(108,140,255,.22); color: #fff; }
     .grid .head.today .today-tag { display: block; font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: .5px; text-transform: uppercase; }
     .grid .cell.today { background: rgba(108,140,255,.06); box-shadow: inset 1px 0 0 var(--accent), inset -1px 0 0 var(--accent); }
+    .grid .head.day-locked { background: rgba(255,199,92,.14); }
+    .grid .cell.day-locked { background: rgba(255,199,92,.045); }
+    .day-lock-btn {
+      position: absolute; top: 4px; right: 5px; width: 25px; height: 25px;
+      padding: 0; border: 1px solid var(--line); border-radius: 7px;
+      background: rgba(13,15,20,.65); color: var(--muted); font-size: 12px;
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .day-lock-btn:hover { color: #fff; border-color: var(--yellow); }
+    .day-lock-btn.locked { color: var(--yellow); border-color: rgba(255,199,92,.55); }
     .grid .head.deadline-red { box-shadow: inset 0 -3px 0 var(--red); }
     .grid .head.deadline-green { box-shadow: inset 0 -3px 0 var(--green); }
     .grid .head.deadline-blue { box-shadow: inset 0 -3px 0 var(--blue); }
@@ -1073,6 +1083,7 @@
           carryOut: [],
         };
       }
+      if (!state.weeks[num].lockedDays) state.weeks[num].lockedDays = {};
       return state.weeks[num];
     }
     // começa zerado: o usuário digita as quantidades na barra e gera
@@ -1095,6 +1106,7 @@
       const adsPer = +cfg.adsPorLeva || 5;
       const start = weekStartISO(num);
       const today = todayISO();
+      const lockedDays = week.lockedDays || {};
 
       // ---- Dias já REAIS (com card e data <= hoje) ficam INTOCADOS — só os
       // dias futuros são (re)gerados. Isso permite reajustar as metas no meio
@@ -1108,6 +1120,9 @@
           if (addDaysISO(start, col.off) <= today) frozenCopyCols.add(col.key);
         });
       }
+      COPY_WORK.forEach((col) => {
+        if (lockedDays[addDaysISO(start, col.off)]) frozenCopyCols.add(col.key);
+      });
       const isFrozenCopy = (col) => frozenCopyCols.has(col.key);
 
       const hasExistingEdit = Object.values(week.edit || {}).some((row) =>
@@ -1119,6 +1134,9 @@
           if (addDaysISO(start, col.off) <= today) frozenEditCols.add(col.key);
         });
       }
+      EDIT_WORK.forEach((col) => {
+        if (lockedDays[addDaysISO(start, col.off)]) frozenEditCols.add(col.key);
+      });
       const isFrozenEdit = (col) => frozenEditCols.has(col.key);
 
       // ---- Ofertas FIXAS (1 leva garantida por copy/semana). Quem já tem
@@ -1192,6 +1210,11 @@
       // ---- COPY: mantém os dias congelados como estão; regenera só os livres
       const copy = {};
       copies.forEach((p) => (copy[p] = { ...(week.copy[p] || {}) }));
+      copies.forEach((p) => {
+        COPY_WORK.forEach((col) => {
+          if (!isFrozenCopy(col)) copy[p][col.key] = null;
+        });
+      });
 
       // anti-repetição: parte do último dia CONGELADO desta semana; se ainda
       // não tiver nenhum, cai pro último dia da semana ANTERIOR (como antes)
@@ -2220,13 +2243,28 @@
       const tISO = todayISO();
       cols.forEach((col) => {
         const h = document.createElement("div");
+        const srcWeek = STATE.weeks[col.srcWeekNum];
+        const dayLocked = !!(srcWeek && srcWeek.lockedDays && srcWeek.lockedDays[col.iso]);
         let cls = "head";
         if (col.weekend) cls += " weekend";
         // linhas de prazo (vermelho/verde/azul) só fazem sentido no operacional
         if (!isCivil && DEADLINES[kind][col.srcColKey]) cls += " " + DEADLINES[kind][col.srcColKey];
         if (col.iso === tISO) cls += " today";
+        if (dayLocked) cls += " day-locked";
         h.className = cls;
         h.innerHTML = `${col.label}<small>${fmtBR(col.iso)}</small>${col.iso === tISO ? '<em class="today-tag">hoje</em>' : ""}`;
+        if (!isCivil && !col.weekend) {
+          const lock = document.createElement("button");
+          lock.type = "button";
+          lock.className = "day-lock-btn" + (dayLocked ? " locked" : "");
+          lock.textContent = dayLocked ? "🔒" : "🔓";
+          lock.title = dayLocked ? "Destravar este dia" : "Travar este dia";
+          lock.onclick = (e) => {
+            e.stopPropagation();
+            toggleDayLock(col.srcWeekNum, col.iso);
+          };
+          h.appendChild(lock);
+        }
         gridEl.appendChild(h);
       });
 
@@ -2240,22 +2278,24 @@
         cols.forEach((col) => {
           const cell = document.createElement("div");
           const isToday = col.iso === tISO;
-          cell.className = "cell" + (col.weekend ? " weekend" : "") + (isToday ? " today" : "");
+          const srcWeek = STATE.weeks[col.srcWeekNum];
+          const dayLocked = !!(srcWeek && srcWeek.lockedDays && srcWeek.lockedDays[col.iso]);
+          cell.className = "cell" + (col.weekend ? " weekend" : "") + (isToday ? " today" : "") + (dayLocked ? " day-locked" : "");
           cell.dataset.kind = kind;
           cell.dataset.person = person.name;
           cell.dataset.col = col.srcColKey || "";
+          cell.dataset.iso = col.iso;
 
           // No modo civil, cada coluna pode vir de uma semana op diferente.
           // Busca a semana correspondente (se existir) e o card.
-          const srcWeek = STATE.weeks[col.srcWeekNum];
           const store = srcWeek && srcWeek[kind] && srcWeek[kind][person.name];
           if (store && col.srcColKey) {
             if (kind === "copy") {
               const a = store[col.srcColKey];
-              if (a) cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey));
+              if (a) cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey, col.iso));
             } else {
               (store[col.srcColKey] || []).forEach((a) =>
-                cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey))
+                cell.appendChild(makeCard(a, cfg, kind, person.name, col.srcColKey, col.iso))
               );
             }
           }
@@ -2266,7 +2306,7 @@
       });
     }
 
-    function makeCard(a, cfg, kind, person, colKey) {
+    function makeCard(a, cfg, kind, person, colKey, iso) {
       const el = document.createElement("div");
       const active = cfg.offers.find((o) => o.code === a.offer && o.active);
       el.className = "card" + (active ? "" : " off");
@@ -2298,7 +2338,7 @@
       el.innerHTML = `<span class="cid">${label}</span><span class="cbadges">${badges}</span>`;
       el.addEventListener("dragstart", (e) => {
         el.classList.add("dragging");
-        e.dataTransfer.setData("text/plain", JSON.stringify({ uid: a.uid, kind, person, colKey }));
+        e.dataTransfer.setData("text/plain", JSON.stringify({ uid: a.uid, kind, person, colKey, iso }));
       });
       el.addEventListener("dragend", () => el.classList.remove("dragging"));
       return el;
@@ -2324,8 +2364,27 @@
           toast("Fim de semana é folga.", "warn");
           return;
         }
+        const week = ensureWeek(STATE, STATE.current);
+        if (week.lockedDays[data.iso] || week.lockedDays[cell.dataset.iso]) {
+          toast("Destrave o dia antes de mover cards para dentro ou para fora dele.", "warn");
+          return;
+        }
         moveCard(data, { kind: cell.dataset.kind, person: cell.dataset.person, colKey: cell.dataset.col });
       });
+    }
+
+    function toggleDayLock(weekNum, iso) {
+      const week = ensureWeek(STATE, weekNum);
+      if (week.locked) {
+        toast("A semana inteira está travada. Destrave a semana primeiro.", "warn");
+        return;
+      }
+      const locked = !week.lockedDays[iso];
+      if (locked) week.lockedDays[iso] = true;
+      else delete week.lockedDays[iso];
+      save();
+      render();
+      toast(`${fmtBR(iso)} ${locked ? "travado — COPY e EDIÇÃO serão preservados" : "destravado"}.`, locked ? "ok" : "warn");
     }
 
     function moveCard(from, to) {
