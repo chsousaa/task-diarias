@@ -175,12 +175,55 @@
       border-radius: 8px; padding: 6px 4px;
     }
     .meta-chip input.qty:focus { outline: none; border-color: var(--accent); }
+    .meta-chip .prio-wrap {
+      display: grid; gap: 2px; padding-left: 8px; border-left: 1px solid var(--line);
+    }
+    .meta-chip .prio-wrap span {
+      color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .45px;
+    }
+    .meta-chip select.priority-select {
+      width: 68px; border: 0; padding: 0; background: transparent; color: var(--text);
+      font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .meta-chip select.priority-select:focus { outline: none; color: var(--accent); }
     .meta-chip.done { border-color: rgba(53,201,138,.5); }
     .meta-chip.over { border-color: var(--red); }
     .meta-chip.total { border-style: dashed; }
     .meta-chip.total.ok { border-color: var(--green); }
     .meta-chip.total.bad { border-color: var(--yellow); }
     .meta-empty { color: var(--muted); padding: 6px; }
+
+    /* ===== Fechamento da semana: separa produção nova de gordura ===== */
+    .week-accounting {
+      display: grid; grid-template-columns: minmax(210px, 1.25fr) repeat(5, minmax(112px, .7fr));
+      gap: 8px; padding: 10px 22px 12px; background: var(--bg-2);
+      border-bottom: 1px solid var(--line);
+    }
+    .week-accounting .wa-intro, .week-accounting .wa-stat {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    }
+    .week-accounting .wa-intro b { display: block; font-size: 12px; margin-bottom: 3px; }
+    .week-accounting .wa-intro small { color: var(--muted); font-size: 10px; line-height: 1.35; }
+    .week-accounting .wa-stat span {
+      display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .35px;
+    }
+    .week-accounting .wa-stat b { display: block; margin-top: 3px; font-size: 17px; }
+    .week-accounting .wa-stat small { color: var(--muted); font-size: 9px; }
+    .week-accounting .wa-stat.in b { color: var(--blue); }
+    .week-accounting .wa-stat.out b { color: var(--yellow); }
+    .week-accounting .wa-stat.traffic b { color: var(--green); }
+    .week-accounting .wa-offers {
+      grid-column: 1 / -1; display: flex; gap: 7px; flex-wrap: wrap; padding-top: 1px;
+    }
+    .week-accounting .wa-offer {
+      border: 1px solid var(--line); background: var(--bg-3); border-radius: 999px;
+      padding: 5px 9px; font-size: 10px; color: var(--muted);
+    }
+    .week-accounting .wa-offer b { color: var(--text); }
+    @media (max-width: 1050px) {
+      .week-accounting { grid-template-columns: repeat(3, 1fr); }
+      .week-accounting .wa-intro { grid-column: 1 / -1; }
+    }
 
     /* ===== Saúde da produção ===== */
     .health-panel { margin: 20px 22px; padding: 18px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; min-height:420px; }
@@ -494,6 +537,7 @@
 
   <!-- Quantidades por oferta + contadores -->
   <section id="metaBar" class="meta-bar"></section>
+  <section id="weekAccounting" class="week-accounting" aria-live="polite"></section>
 
   <section id="healthPanel" class="health-panel hidden" aria-live="polite">
     <div class="health-head">
@@ -923,6 +967,10 @@
     function offerPriority(cfg, code) {
       const o = cfg.offers.find((x) => x.code === code);
       return o && o.priority != null ? o.priority : 99;
+    }
+    function priorityLabel(value) {
+      const n = +value || 2;
+      return n <= 1 ? "Alta" : n === 2 ? "Normal" : "Baixa";
     }
     // maior "priority" = MENOS prioritária. Retorna o código da oferta menos
     // prioritária presente no pool (candidata a virar gordura).
@@ -1568,6 +1616,37 @@
       return counts;
     }
 
+    function renderWeekAccounting(week) {
+      const el = document.getElementById("weekAccounting");
+      if (!el) return;
+      const cfg = STATE.config;
+      const counts = countByOffer(week);
+      const adsPer = +cfg.adsPorLeva || 5;
+      const planned = Object.values(week.meta || {}).reduce((sum, n) => sum + (+n || 0), 0);
+      const produced = Object.values(counts).reduce((sum, c) => sum + c.placed, 0);
+      const carryIn = Object.values(counts).reduce((sum, c) => sum + c.carryIn, 0);
+      const carryOut = Object.values(counts).reduce((sum, c) => sum + c.gorduraOut, 0);
+      const traffic = produced + carryIn - carryOut;
+      const fmt = (levas) => `${levas} leva${levas === 1 ? "" : "s"} · ${levas * adsPer} ads`;
+      const offerPills = activeOffers(cfg).map((o) => {
+        const c = counts[o.code] || { placed: 0, carryIn: 0, gorduraOut: 0 };
+        const ready = c.placed + c.carryIn - c.gorduraOut;
+        const details = [
+          c.carryIn ? `+${c.carryIn} recebida${c.carryIn === 1 ? "" : "s"}` : "",
+          c.gorduraOut ? `-${c.gorduraOut} p/ próxima` : "",
+        ].filter(Boolean).join(" · ");
+        return `<span class="wa-offer" style="border-color:${o.color}55"><b>${o.code}: ${ready}</b> para tráfego${details ? ` · ${details}` : ""}</span>`;
+      }).join("");
+      el.innerHTML = `
+        <div class="wa-intro"><b>Fechamento da semana</b><small>A produção nova fica separada das levas recebidas ou enviadas para outra semana. Assim a gordura não infla a meta.</small></div>
+        <div class="wa-stat"><span>Meta</span><b>${planned}</b><small>${fmt(planned)}</small></div>
+        <div class="wa-stat"><span>Produção nova</span><b>${produced}</b><small>${fmt(produced)}</small></div>
+        <div class="wa-stat in"><span>Veio de antes</span><b>+${carryIn}</b><small>${carryIn * adsPer} ads</small></div>
+        <div class="wa-stat out"><span>Vai para próxima</span><b>-${carryOut}</b><small>${carryOut * adsPer} ads</small></div>
+        <div class="wa-stat traffic"><span>Tráfego previsto</span><b>${traffic}</b><small>${fmt(traffic)}</small></div>
+        <div class="wa-offers">${offerPills}</div>`;
+    }
+
     /* ============================================================
        RENDER
        ============================================================ */
@@ -2153,9 +2232,25 @@
             week.meta[o.code] = +e.target.value || 0;
             save();
             updateTotalChip(week);
+            renderWeekAccounting(week);
           });
         }
         chip.appendChild(inp);
+
+        const prio = document.createElement("label");
+        prio.className = "prio-wrap";
+        prio.title = "A prioridade não muda a quantidade pedida. Ela define qual oferta pode virar gordura: Alta é protegida; Baixa sai primeiro.";
+        prio.innerHTML = `<span>prioridade</span><select class="priority-select" aria-label="Prioridade de ${o.code}">
+          <option value="1">Alta</option><option value="2">Normal</option><option value="3">Baixa</option>
+        </select>`;
+        const prioritySelect = prio.querySelector("select");
+        prioritySelect.value = String(Math.max(1, Math.min(3, +o.priority || 2)));
+        prioritySelect.addEventListener("change", (e) => {
+          o.priority = +e.target.value;
+          save();
+          toast(`${o.code}: prioridade ${priorityLabel(o.priority)}.`, "ok");
+        });
+        chip.appendChild(prio);
         bar.appendChild(chip);
       });
 
@@ -2174,6 +2269,7 @@
       );
       document.getElementById("copyCount").textContent = copyN;
       document.getElementById("editCount").textContent = editN;
+      renderWeekAccounting(week);
     }
 
     function metaTarget() {
@@ -2730,6 +2826,7 @@
       const isProduction = view === "production";
       const isTraffic = view === "traffic";
       document.getElementById("metaBar").classList.toggle("hidden", !isPlan);
+      document.getElementById("weekAccounting").classList.toggle("hidden", !isPlan);
       document.getElementById("healthPanel").classList.toggle("hidden", !isProduction || !cloudIsOwner);
       document.getElementById("boards").classList.toggle("hidden", !isPlan);
       document.getElementById("trafficView").classList.toggle("hidden", !isTraffic);
