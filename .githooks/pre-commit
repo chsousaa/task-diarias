@@ -5,3 +5,23 @@ if git diff --cached --no-ext-diff --unified=0 | grep -E '(sbp_[A-Za-z0-9]{20,}|
   echo "ERRO: possível segredo detectado. Commit bloqueado."
   exit 1
 fi
+
+# O JavaScript principal é inline e protegido por hash na CSP. Se o código
+# mudar sem atualizar o hash, o navegador bloqueia inclusive o botão de login.
+node - "$PWD/index.html" <<'NODE'
+const fs = require("fs");
+const crypto = require("crypto");
+const file = process.argv[2];
+if (!fs.existsSync(file)) process.exit(0);
+const html = fs.readFileSync(file, "utf8");
+const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .map((match) => match[1])
+  .filter((code) => code.trim());
+if (!scripts.length) process.exit(0);
+const hash = "sha384-" + crypto.createHash("sha384").update(scripts[0]).digest("base64");
+if (!html.includes(`script-src 'self' '${hash}'`)) {
+  console.error("ERRO: o hash CSP do JavaScript interno está desatualizado.");
+  console.error("Use este hash no script-src:", hash);
+  process.exit(1);
+}
+NODE
