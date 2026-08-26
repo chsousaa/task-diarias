@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-kGk25CbVgnnbwxwZAJGval/HIsKBxGWBmh63OdkLjlYjjpOWznEGdOsYh+licXk4' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-sApo8i6Yb21CfAFrKGOQuJCFnG/WvRBW1tWqjr8qwjhp38VGnYKIZxppMjLXxLtj' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -2636,7 +2636,7 @@
         label = `${auSig}-${a.offer}${a.slot === 2 ? "2" : ""}`;
         el.title = `${a.id || ""}${a.id ? " · " : ""}Copy: ${a.by} · Editor: ${person}`;
       } else if (a.id) {
-        el.title += ` · ${a.id}`;
+        el.title += ` · ${a.id} · duplo clique para trocar a oferta`;
       }
 
       el.innerHTML = `<span class="cid">${label}</span><span class="cbadges">${badges}</span>`;
@@ -2645,7 +2645,46 @@
         e.dataTransfer.setData("text/plain", JSON.stringify({ uid: a.uid, kind, person, colKey, iso }));
       });
       el.addEventListener("dragend", () => el.classList.remove("dragging"));
+      if (kind === "copy") {
+        el.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openCardOfferPrompt(a.uid);
+        });
+      }
       return el;
+    }
+
+    function openCardOfferPrompt(cardUid) {
+      const week = ensureWeek(STATE, STATE.current);
+      let card = null;
+      Object.values(week.copy || {}).some((row) =>
+        Object.values(row || {}).some((item) => {
+          if (item && item.uid === cardUid) { card = item; return true; }
+          return false;
+        })
+      );
+      if (!card) return;
+      const options = activeOffers(STATE.config).map((o) => o.code).join(", ");
+      const answer = window.prompt(`Trocar ${card.offer} por qual oferta?\nOpções: ${options}`, card.offer);
+      if (answer == null) return;
+      const newOffer = answer.trim().toUpperCase();
+      if (!activeOffers(STATE.config).some((o) => o.code === newOffer)) {
+        toast(`Oferta inválida. Use: ${options}.`, "warn");
+        return;
+      }
+      if (newOffer === card.offer) return;
+      const oldOffer = card.offer;
+      card.offer = newOffer;
+      week.meta[oldOffer] = Math.max(0, (+week.meta[oldOffer] || 0) - 1);
+      week.meta[newOffer] = (+week.meta[newOffer] || 0) + 1;
+      renumberWeek(week);
+      week.carryOut = (week.carryOut || []).map((item) =>
+        item.uid === cardUid ? { ...item, offer: newOffer, id: card.id, n1: card.n1, n2: card.n2 } : item
+      );
+      save();
+      render();
+      toast(`${oldOffer} trocado por ${newOffer}. Edição e contagem atualizadas.`, "ok");
     }
 
     /* ---------- Drag & drop (só dentro do mesmo board) ---------- */
@@ -2748,7 +2787,7 @@
           c.n1 = n1;
           c.n2 = n2;
           c.id = nomen(c.offer, sigla, n1, n2);
-          patched[c.uid] = { id: c.id, n1, n2, by: person };
+          patched[c.uid] = { id: c.id, offer: c.offer, n1, n2, by: person };
         });
       });
 
