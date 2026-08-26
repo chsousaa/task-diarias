@@ -87,8 +87,9 @@ Deno.serve(async (req) => {
         await supabase.from("integration_sync_log").update({ status: "created", clickup_task_id: found.id, updated_at: new Date().toISOString() }).eq("user_id", user.id).eq("sync_date", date).eq("copy_code", item.copyCode);
         skipped++; continue;
       }
-      const numberSource = item.source === "drive" ? "conferida no Google Drive" : "reservada no servidor (oferta nova)";
-      const payload: Record<string, unknown> = { name: item.name, due_date: new Date(`${date}T12:00:00-03:00`).getTime(), due_date_time: true, markdown_content: `Demanda diária de copy\n\nOferta: ${item.offer}\nCopy: ${item.copy}\nNumeração ${numberSource}: ${item.start}-${item.end}` };
+      // A task nasce limpa: somente nome e responsável. Sem descrição e sem
+      // prazo; o fluxo da equipe dentro do ClickUp controla a continuidade.
+      const payload: Record<string, unknown> = { name: item.name };
       if (assignees[item.copyCode]) payload.assignees = [Number(assignees[item.copyCode])];
       const res = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, { method: "POST", headers: { Authorization: token, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await res.json();
