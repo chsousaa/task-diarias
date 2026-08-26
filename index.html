@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-zOS9Tseg3YuhT/0Zk3vnKbdz65/ONfC/F/uvZvUyvymg7m8aDw8xJt0k/4U4Bfh9' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-mQaRVhlLeZpXFwhpdtysb4g+qKmkMl/gd2dTp1p8PdTTpUQgzqKQNamOZxbs/ZAy' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -1286,15 +1286,19 @@
         });
       });
 
-      // ---- pool de levas a partir das quantidades restantes (exclui fixas)
-      let pool = [];
+      // ---- saldo por oferta (exclui as ofertas fixas, reservadas acima).
+      // A distribuição por copy é calculada mais abaixo levando em conta:
+      //   1) quantidade desta semana (diferença máxima possível de 1);
+      //   2) histórico anterior da mesma oferta;
+      //   3) capacidade restante de 5 levas por copy.
+      // Isso faz a "sobra" de uma divisão que não fecha por 3 rodar entre as
+      // pessoas, em vez de cair repetidamente no mesmo copy.
+      const remainingByOffer = {};
       Object.entries(week.meta).forEach(([code, q]) => {
         const def = cfg.offers.find((o) => o.code === code);
         if (def && def.fixedPerCopy) return;
-        const remain = Math.max(0, (+q || 0) - (usedByOffer[code] || 0));
-        for (let i = 0; i < remain; i++) pool.push(code);
+        remainingByOffer[code] = Math.max(0, (+q || 0) - (usedByOffer[code] || 0));
       });
-      shuffle(pool);
 
       // contador de nº de ad por copy+oferta — parte de onde parou (semanas
       // anteriores) e também considera os cards já congelados desta semana.
@@ -1355,18 +1359,89 @@
       const rotPerson = copies.length ? copies[(num - 1) % copies.length] : null;
       const lastCol = COPY_WORK[COPY_WORK.length - 1];
 
-      // Reserva JÁ a oferta menos prioritária pro último dia da rotPerson —
-      // se deixasse pro sorteio dia-a-dia, ela podia ser toda consumida
-      // ANTES de chegar a vez da rotPerson (mesmo sobrando capacidade na
-      // semana), e a gordura acabava caindo numa oferta prioritária à toa.
-      // Só reserva se o último dia ainda for LIVRE (se já é congelado/real,
-      // a gordura dessa semana já foi decidida antes — reservar aqui seria
-      // desperdiçar oferta que não vai ser usada em lugar nenhum).
+      // Reserva JÁ a oferta menos prioritária pro último dia da rotPerson.
+      // Ela sai do saldo antes da divisão justa e ocupa uma das 5 vagas dessa
+      // pessoa. Assim a justiça por copy e a regra da gordura convivem.
       let reservedGordura = null;
-      if (rotPerson && pool.length && !isFrozenCopy(lastCol)) {
-        const leastPri = leastPriorityInPool(cfg, pool);
-        if (leastPri) reservedGordura = pool.splice(pool.indexOf(leastPri), 1)[0];
+      if (rotPerson && !isFrozenCopy(lastCol)) {
+        const remainingCodes = Object.keys(remainingByOffer).filter((code) => remainingByOffer[code] > 0);
+        const leastPri = leastPriorityInPool(cfg, remainingCodes);
+        if (leastPri) {
+          reservedGordura = leastPri;
+          remainingByOffer[leastPri]--;
+        }
       }
+
+      // Histórico acumulado por copy/oferta antes desta semana. O desempate
+      // usa quem escreveu menos da oferta; se ainda empatar, aplica um rodízio
+      // determinístico por semana para não favorecer sempre o primeiro nome.
+      const historicalByCopy = {};
+      copies.forEach((p) => (historicalByCopy[p] = {}));
+      Object.entries(STATE.weeks || {}).forEach(([weekKey, oldWeek]) => {
+        if (+weekKey >= num || !oldWeek || !oldWeek.copy) return;
+        copies.forEach((p) => {
+          Object.values(oldWeek.copy[p] || {}).forEach((card) => {
+            if (!card) return;
+            historicalByCopy[p][card.offer] = (historicalByCopy[p][card.offer] || 0) + 1;
+          });
+        });
+      });
+
+      const weeklyByCopy = {};
+      const freeSlots = {};
+      const personPools = {};
+      copies.forEach((p) => {
+        weeklyByCopy[p] = {};
+        personPools[p] = [];
+        COPY_WORK.forEach((col) => {
+          const card = copy[p] && copy[p][col.key];
+          if (isFrozenCopy(col) && card)
+            weeklyByCopy[p][card.offer] = (weeklyByCopy[p][card.offer] || 0) + 1;
+        });
+        if (p === rotPerson && reservedGordura)
+          weeklyByCopy[p][reservedGordura] = (weeklyByCopy[p][reservedGordura] || 0) + 1;
+        const openDays = COPY_WORK.filter((col) => !isFrozenCopy(col)).length;
+        const fixedReserved = Object.keys(reserved[p] || {}).length;
+        const gorduraReserved = p === rotPerson && reservedGordura ? 1 : 0;
+        freeSlots[p] = Math.max(0, openDays - fixedReserved - gorduraReserved);
+      });
+
+      // Distribui uma unidade por oferta a cada rodada. Primeiro equilibra a
+      // semana atual; depois usa o histórico; por fim gira o desempate.
+      const offerOrder = Object.keys(remainingByOffer);
+      let remainingTotal = Object.values(remainingByOffer).reduce((a, b) => a + b, 0);
+      let fairGuard = 0;
+      while (remainingTotal > 0 && fairGuard++ < 500) {
+        let progressed = false;
+        for (let oi = 0; oi < offerOrder.length; oi++) {
+          const code = offerOrder[oi];
+          if (!remainingByOffer[code]) continue;
+          const candidates = copies.filter((p) => freeSlots[p] > 0);
+          if (!candidates.length) break;
+          const tieStart = ((num - 1 + oi) % Math.max(1, copies.length) + copies.length) % copies.length;
+          candidates.sort((a, b) => {
+            const weekDiff = (weeklyByCopy[a][code] || 0) - (weeklyByCopy[b][code] || 0);
+            if (weekDiff) return weekDiff;
+            const historyDiff = (historicalByCopy[a][code] || 0) - (historicalByCopy[b][code] || 0);
+            if (historyDiff) return historyDiff;
+            const ai = (copies.indexOf(a) - tieStart + copies.length) % copies.length;
+            const bi = (copies.indexOf(b) - tieStart + copies.length) % copies.length;
+            return ai - bi;
+          });
+          const chosen = candidates[0];
+          personPools[chosen].push(code);
+          weeklyByCopy[chosen][code] = (weeklyByCopy[chosen][code] || 0) + 1;
+          freeSlots[chosen]--;
+          remainingByOffer[code]--;
+          remainingTotal--;
+          progressed = true;
+        }
+        if (!progressed) break;
+      }
+
+      // Mistura apenas a ordem dentro do pool de cada pessoa; as quantidades
+      // já estão travadas pela divisão justa acima.
+      copies.forEach((p) => shuffle(personPools[p]));
 
       for (const col of COPY_WORK) {
         const isLastDay = col === lastCol;
@@ -1390,20 +1465,22 @@
             // PRIORIDADE: usa a oferta reservada no início — garantida,
             // não depende do que sobrou no pool até aqui.
             code = reservedGordura;
-          } else if (pool.length === 0) {
+          } else if (!personPools[p].length) {
             continue; // sem pool hoje pra essa pessoa — mas outros dias/pessoas seguem
           } else if (isLastDay && p === rotPerson) {
-            // fallback (não devia sobrar reservedGordura vazio, mas por via das dúvidas)
-            const leastPri = leastPriorityInPool(cfg, pool);
-            let idx = pool.findIndex((o) => o === leastPri && o !== lastOffer[p]);
-            if (idx < 0) idx = pool.indexOf(leastPri);
-            code = pool.splice(idx, 1)[0];
+            // fallback: escolhe a menos prioritária do pool justo desta pessoa
+            const leastPri = leastPriorityInPool(cfg, personPools[p]);
+            let idx = personPools[p].findIndex((o) => o === leastPri && o !== lastOffer[p]);
+            if (idx < 0) idx = personPools[p].indexOf(leastPri);
+            code = personPools[p].splice(idx, 1)[0];
           } else {
-            // seleção normal com anti-repetição e mistura no dia
-            let idx = pool.findIndex((o) => o !== lastOffer[p] && !usedToday.includes(o));
-            if (idx < 0) idx = pool.findIndex((o) => o !== lastOffer[p]);
+            // seleção normal dentro da cota justa deste copy, mantendo
+            // anti-repetição e mistura das ofertas no mesmo dia.
+            let idx = personPools[p].findIndex((o) => o !== lastOffer[p] && !usedToday.includes(o));
+            if (idx < 0) idx = personPools[p].findIndex((o) => o !== lastOffer[p]);
+            if (idx < 0) idx = personPools[p].findIndex((o) => !usedToday.includes(o));
             if (idx < 0) idx = 0;
-            code = pool.splice(idx, 1)[0];
+            code = personPools[p].splice(idx, 1)[0];
           }
           usedToday.push(code);
           const [n1, n2] = takeRange(p, code);
