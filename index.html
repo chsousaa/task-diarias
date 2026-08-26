@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-q53MSTLHYOojf3VULTZeQ8BDtcVDUODbcpQUZwHR32lp/FV5xZRCvMmiWq/tun+s' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-zOS9Tseg3YuhT/0Zk3vnKbdz65/ONfC/F/uvZvUyvymg7m8aDw8xJt0k/4U4Bfh9' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -304,6 +304,7 @@
     .grid .rowhead .role { font-size: 10px; color: var(--muted); font-weight: 400; }
     .pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
     .grid .rowhead.backup::after { content: "tapa-buraco"; font-size: 9px; color: var(--yellow); }
+    .grid .rowhead.manual-only::after { content: "só avulsas"; font-size: 9px; color: #c99cff; }
     .grid .cell { display: flex; flex-direction: column; gap: 4px; }
     .grid .cell.weekend { background: #12151d; }
     .grid .cell.dragover { background: rgba(108,140,255,.12); outline: 1px dashed var(--accent); outline-offset: -3px; }
@@ -321,6 +322,21 @@
     .card .b { font-size: 9px; background: rgba(0,0,0,.28); color: #fff; border-radius: 4px; padding: 0 4px; font-weight: 700; }
     .card.dragging { opacity: .4; }
     .card.off { filter: grayscale(.3); }
+    .card.manual-task {
+      background: linear-gradient(135deg, #4e466f, #35304f) !important;
+      border: 1px solid rgba(185,107,255,.45); border-left: 5px solid #b96bff;
+      color: #f4f1ff; cursor: pointer; gap: 7px; align-items: flex-start;
+    }
+    .card.manual-task:hover { filter: brightness(1.12); }
+    .card.manual-task.done { opacity: .58; background: var(--bg-3) !important; border-color: var(--line); }
+    .card.manual-task.done .manual-title { text-decoration: line-through; }
+    .manual-check {
+      width: 17px; height: 17px; min-width: 17px; border-radius: 5px; border: 1px solid rgba(255,255,255,.45);
+      background: rgba(0,0,0,.18); color: #fff; display:grid; place-items:center; cursor:pointer; padding:0;
+    }
+    .manual-task-text { min-width:0; flex:1; }
+    .manual-title { display:block; font-size:11px; font-weight:750; line-height:1.2; overflow-wrap:anywhere; }
+    .manual-type { display:block; margin-top:3px; font-size:8px; text-transform:uppercase; letter-spacing:.45px; color:#d9cff8; }
 
     /* ===== Legend ===== */
     .legend {
@@ -376,6 +392,15 @@
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     .field { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; font-size: 12px; color: var(--muted); }
     .field input { max-width: 260px; }
+    .field textarea {
+      min-height: 78px; resize: vertical; background: var(--bg-3); color: var(--text);
+      border: 1px solid var(--line); border-radius: 7px; padding: 8px 9px; font: inherit;
+    }
+    .field textarea:focus { outline:none; border-color:var(--accent); }
+    .task-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .task-form-grid .field { margin-top:0; }
+    .task-form-grid .field.full { grid-column:1 / -1; }
+    @media (max-width:650px) { .task-form-grid { grid-template-columns:1fr; } .task-form-grid .field.full { grid-column:auto; } }
     .muted { color: var(--muted); }
     .muted code { background: var(--bg-3); padding: 1px 5px; border-radius: 4px; color: var(--accent); }
 
@@ -527,6 +552,7 @@
     </div>
 
     <div class="actions">
+      <button id="addTaskBtn" class="btn" title="Adicionar VSL, funil, correção ou outra demanda avulsa">＋ Tarefa</button>
       <button id="lockWeek" class="btn" title="Travar: marca como semana REAL e impede regerar por cima">🔓 Travar</button>
       <button id="generateBtn" class="btn primary">⚡ Gerar semana</button>
       <button id="clickupSyncBtn" class="btn clickup-soon" title="Preparar as tarefas de copy do dia para o ClickUp">↻ Sincronizar tarefas do dia</button>
@@ -553,7 +579,7 @@
     <section class="board" data-board="copy">
       <div class="board-head">
         <h2>COPY <span class="tag red">prazo vermelho</span></h2>
-        <div class="board-meta"><span id="copyCount">0</span> levas</div>
+        <div class="board-meta"><span id="copyCount">0</span> levas <span id="copyTaskCount"></span></div>
       </div>
       <div id="copyGrid" class="grid"></div>
     </section>
@@ -562,7 +588,7 @@
     <section class="board" data-board="edit">
       <div class="board-head">
         <h2>EDIÇÃO <span class="tag green">prazo verde</span> <span class="tag blue">tráfego azul</span></h2>
-        <div class="board-meta"><span id="editCount">0</span> levas</div>
+        <div class="board-meta"><span id="editCount">0</span> levas <span id="editTaskCount"></span></div>
       </div>
       <div id="editGrid" class="grid"></div>
     </section>
@@ -693,6 +719,26 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <div id="taskModal" class="modal hidden">
+    <div class="modal-box" style="max-width:620px">
+      <div class="modal-head"><h2 id="taskModalTitle">Nova tarefa</h2><button id="closeTask" class="icon-btn">✕</button></div>
+      <div class="modal-body">
+        <div class="task-form-grid">
+          <label class="field full">Nome da tarefa<input id="taskTitle" type="text" maxlength="120" placeholder="Ex.: Editar VSL do novo funil" /></label>
+          <label class="field">Área<select id="taskArea"><option value="edit">Edição</option><option value="copy">Copy</option></select></label>
+          <label class="field">Responsável<select id="taskPerson"></select></label>
+          <label class="field">Data<input id="taskDate" type="date" /></label>
+          <label class="field">Tipo<select id="taskType"><option value="normal">Tarefa normal</option><option value="vsl">VSL / Funil</option><option value="correcao">Correção</option><option value="outro">Outro</option></select></label>
+          <label class="field full">Observação<textarea id="taskNotes" maxlength="500" placeholder="Briefing, link ou detalhe importante (opcional)"></textarea></label>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button id="deleteTask" class="btn ghost danger hidden">Excluir tarefa</button>
+        <div style="margin-left:auto;display:flex;gap:8px"><button id="cancelTask" class="btn">Cancelar</button><button id="saveTask" class="btn primary">Salvar tarefa</button></div>
+      </div>
+    </div>
+  </div>
+
   <div id="syncModal" class="modal hidden">
     <div class="modal-box" style="max-width:600px">
       <div class="modal-head"><h2>Sincronizar com o ClickUp</h2><button id="closeSync" class="icon-btn">✕</button></div>
@@ -776,6 +822,7 @@
           editTeam: [
             { name: "Walison", sigla: "WA", active: true, backup: false },
             { name: "Mariana", sigla: "MA", active: true, backup: false },
+            { name: "Ferramenta MeJ", sigla: "MEJ", active: true, backup: false, manualOnly: true },
             { name: "Leticia", sigla: "LE", active: false, backup: false },
             { name: "Gabriel", sigla: "GA", active: false, backup: false },
             { name: "Leandro", sigla: "LD", active: true, backup: true },
@@ -788,6 +835,7 @@
           weekStart: nextThursdayISO(),
         },
         weeks: {},
+        manualTasks: [],
         current: 1,
         layout: "operational", // "operational" (QUI→QUA) ou "civil" (SEG→DOM)
         civilMondayISO: null, // se null, calcula do HOJE
@@ -1007,6 +1055,7 @@
     }
     function migrate(s) {
       sanitizeStateStrings(s);
+      if (!Array.isArray(s.manualTasks)) s.manualTasks = [];
       const taken = [];
       const copyPalette = ["#4d9bff", "#b96bff", "#ff6bb3", "#5cffd6", "#ffd166", "#8aff5c"];
       (s.config.copyTeam || []).forEach((p, i) => {
@@ -1020,6 +1069,16 @@
         if (!p.sigla) p.sigla = siglaFromName(p.name, takenEd);
         takenEd.push(p.sigla);
       });
+      // Linha para demandas avulsas de edição (VSL, funil etc.). Ela aparece
+      // no quadro, mas não participa da distribuição automática das 15 levas.
+      if (!(s.config.editTeam || []).some((p) => p.name === "Ferramenta MeJ")) {
+        s.config.editTeam.push({ name: "Ferramenta MeJ", sigla: "MEJ", active: true, backup: false, manualOnly: true });
+      } else {
+        const mej = s.config.editTeam.find((p) => p.name === "Ferramenta MeJ");
+        mej.active = true;
+        mej.manualOnly = true;
+        if (!mej.sigla) mej.sigla = "MEJ";
+      }
       // numeração de ads: base + qtd por leva
       if (s.config.adsPorLeva == null) s.config.adsPorLeva = 5;
       if (!s.config.adBase || Object.keys(s.config.adBase).length === 0)
@@ -1436,8 +1495,8 @@
          mesmo dia: só há 3 copies, não teria criativo e criaria defasagem.
        - Tapa-buraco (Leandro) só entra se a carga do dia não couber nos titulares. */
     function buildEdit(cfg, perDay, rotPerson, lastDupla, initLastOffer) {
-      const mains = cfg.editTeam.filter((p) => p.active && !p.backup).map((p) => p.name);
-      const backups = cfg.editTeam.filter((p) => p.active && p.backup).map((p) => p.name);
+      const mains = cfg.editTeam.filter((p) => p.active && !p.backup && !p.manualOnly).map((p) => p.name);
+      const backups = cfg.editTeam.filter((p) => p.active && p.backup && !p.manualOnly).map((p) => p.name);
 
       const maxDia = Math.max(0, ...perDay.map((d) => d.length));
       let editors = mains.slice();
@@ -2269,6 +2328,15 @@
       );
       document.getElementById("copyCount").textContent = copyN;
       document.getElementById("editCount").textContent = editN;
+      const taskStart = STATE.layout === "civil" ? (STATE.civilMondayISO || mondayOfISO(todayISO())) : weekStartISO(week.num);
+      const copyTaskEnd = addDaysISO(taskStart, 6);
+      const editTaskStart = STATE.layout === "civil" ? taskStart : addDaysISO(taskStart, 1);
+      const editTaskEnd = STATE.layout === "civil" ? copyTaskEnd : addDaysISO(taskStart, 7);
+      const pendingTasks = (STATE.manualTasks || []).filter((t) => !t.done);
+      const copyTasks = pendingTasks.filter((t) => t.area === "copy" && t.date >= taskStart && t.date <= copyTaskEnd).length;
+      const editTasks = pendingTasks.filter((t) => t.area === "edit" && t.date >= editTaskStart && t.date <= editTaskEnd).length;
+      document.getElementById("copyTaskCount").textContent = copyTasks ? ` · ${copyTasks} tarefa${copyTasks === 1 ? "" : "s"} pendente${copyTasks === 1 ? "" : "s"}` : "";
+      document.getElementById("editTaskCount").textContent = editTasks ? ` · ${editTasks} tarefa${editTasks === 1 ? "" : "s"} pendente${editTasks === 1 ? "" : "s"}` : "";
       renderWeekAccounting(week);
     }
 
@@ -2289,6 +2357,36 @@
           ? `faltam ${t - sum} p/ preencher a capacidade`
           : `${sum - t} acima da capacidade dos copys`
       }</small></div>`;
+    }
+
+    const MANUAL_TYPE_LABELS = { normal: "Tarefa", vsl: "VSL / Funil", correcao: "Correção", outro: "Outro" };
+    let editingManualTaskId = null;
+
+    function manualTasksFor(kind, person, iso) {
+      return (STATE.manualTasks || []).filter((t) => t.area === kind && t.person === person && t.date === iso);
+    }
+
+    function makeManualTaskCard(task) {
+      const el = document.createElement("div");
+      el.className = "card manual-task" + (task.done ? " done" : "");
+      el.title = `${MANUAL_TYPE_LABELS[task.type] || "Tarefa"}${task.notes ? ` · ${task.notes}` : ""} · clique para editar`;
+      const check = document.createElement("button");
+      check.type = "button";
+      check.className = "manual-check";
+      check.textContent = task.done ? "✓" : "";
+      check.title = task.done ? "Marcar como pendente" : "Marcar como concluída";
+      check.onclick = (e) => {
+        e.stopPropagation();
+        task.done = !task.done;
+        task.updatedAt = new Date().toISOString();
+        save(); render();
+      };
+      const text = document.createElement("span");
+      text.className = "manual-task-text";
+      text.innerHTML = `<span class="manual-title">${escapeHTML(task.title)}</span><span class="manual-type">${escapeHTML(MANUAL_TYPE_LABELS[task.type] || "Tarefa")}</span>`;
+      el.append(check, text);
+      el.onclick = () => openTaskModal(task.id);
+      return el;
     }
 
     function renderBoard(kind, week) {
@@ -2366,7 +2464,7 @@
 
       people.forEach((person) => {
         const rh = document.createElement("div");
-        rh.className = "rowhead" + (person.backup ? " backup" : "");
+        rh.className = "rowhead" + (person.backup ? " backup" : "") + (person.manualOnly ? " manual-only" : "");
         const dot = person.color ? `<i class="pdot" style="background:${person.color}"></i>` : "";
         rh.innerHTML = `${dot}<span>${person.name}</span>`;
         gridEl.appendChild(rh);
@@ -2395,6 +2493,7 @@
               );
             }
           }
+          manualTasksFor(kind, person.name, col.iso).forEach((task) => cell.appendChild(makeManualTaskCard(task)));
           // Drag-drop só no operacional (no civil pode misturar semanas diferentes)
           if (!isCivil) attachDrop(cell);
           gridEl.appendChild(cell);
@@ -2663,7 +2762,7 @@
         row.className = "mini-row";
         const backupTgl =
           kind === "edit"
-            ? `<label class="tgl"><input type="checkbox" ${p.backup ? "checked" : ""} data-i="${i}" data-f="backup" /> tapa-buraco</label>`
+            ? `<label class="tgl"><input type="checkbox" ${p.backup ? "checked" : ""} data-i="${i}" data-f="backup" /> tapa-buraco</label><label class="tgl" title="Aparece no quadro, mas não recebe levas automáticas"><input type="checkbox" ${p.manualOnly ? "checked" : ""} data-i="${i}" data-f="manualOnly" /> só avulsas</label>`
             : "";
         const siglaInp =
           kind === "copy"
@@ -2693,6 +2792,70 @@
           renderTeamList(kind);
         })
       );
+    }
+
+    function fillTaskPeople(preferred) {
+      const area = document.getElementById("taskArea").value;
+      const team = area === "copy" ? STATE.config.copyTeam : STATE.config.editTeam;
+      const select = document.getElementById("taskPerson");
+      const active = team.filter((p) => p.active);
+      select.innerHTML = active.map((p) => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`).join("");
+      if (preferred && active.some((p) => p.name === preferred)) select.value = preferred;
+      else if (area === "edit" && active.some((p) => p.name === "Ferramenta MeJ")) select.value = "Ferramenta MeJ";
+    }
+
+    function openTaskModal(taskId = null) {
+      const task = taskId ? (STATE.manualTasks || []).find((t) => t.id === taskId) : null;
+      editingManualTaskId = task ? task.id : null;
+      document.getElementById("taskModalTitle").textContent = task ? "Editar tarefa" : "Nova tarefa";
+      document.getElementById("taskTitle").value = task ? task.title : "";
+      document.getElementById("taskArea").value = task ? task.area : "edit";
+      document.getElementById("taskDate").value = task ? task.date : todayISO();
+      document.getElementById("taskType").value = task ? task.type : "normal";
+      document.getElementById("taskNotes").value = task ? (task.notes || "") : "";
+      fillTaskPeople(task && task.person);
+      document.getElementById("deleteTask").classList.toggle("hidden", !task);
+      document.getElementById("taskModal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("taskTitle").focus(), 0);
+    }
+
+    function closeTaskModal() {
+      editingManualTaskId = null;
+      document.getElementById("taskModal").classList.add("hidden");
+    }
+
+    function saveManualTask() {
+      const title = document.getElementById("taskTitle").value.trim();
+      const area = document.getElementById("taskArea").value;
+      const person = document.getElementById("taskPerson").value;
+      const date = document.getElementById("taskDate").value;
+      if (!title || !person || !date) {
+        toast("Preencha o nome, o responsável e a data.", "warn");
+        return;
+      }
+      const now = new Date().toISOString();
+      const data = {
+        title: sanitizeStateStrings(title), area, person, date,
+        type: document.getElementById("taskType").value,
+        notes: sanitizeStateStrings(document.getElementById("taskNotes").value.trim()),
+        updatedAt: now,
+      };
+      const wasEditing = !!editingManualTaskId;
+      if (wasEditing) {
+        const task = STATE.manualTasks.find((t) => t.id === editingManualTaskId);
+        if (task) Object.assign(task, data);
+      } else {
+        STATE.manualTasks.push({ id: `task-${uid()}`, done: false, createdAt: now, ...data });
+      }
+      save(); closeTaskModal(); render();
+      toast(wasEditing ? "Tarefa atualizada." : "Tarefa adicionada.", "ok");
+    }
+
+    function deleteManualTask() {
+      if (!editingManualTaskId) return;
+      STATE.manualTasks = (STATE.manualTasks || []).filter((t) => t.id !== editingManualTaskId);
+      save(); closeTaskModal(); render();
+      toast("Tarefa excluída.", "warn");
     }
 
     /* ============================================================
@@ -2731,6 +2894,18 @@
         });
         txt += `${p.name}${p.backup ? " (tapa-buraco)" : ""}: ${cells.join("  ")}\n`;
       });
+
+      const manualStart = weekStartISO(week.num);
+      const manualEnd = addDaysISO(manualStart, 7);
+      const manual = (STATE.manualTasks || [])
+        .filter((t) => t.date >= manualStart && t.date <= manualEnd)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.person.localeCompare(b.person));
+      if (manual.length) {
+        txt += `\n— TAREFAS AVULSAS —\n`;
+        manual.forEach((t) => {
+          txt += `${t.done ? "✓" : "○"} ${fmtBR(t.date)} · ${t.area === "copy" ? "COPY" : "EDIÇÃO"} · ${t.person}: ${t.title} (${MANUAL_TYPE_LABELS[t.type] || "Tarefa"})\n`;
+        });
+      }
 
       if (navigator.clipboard) {
         navigator.clipboard.writeText(txt).then(
@@ -2832,6 +3007,7 @@
       document.getElementById("trafficView").classList.toggle("hidden", !isTraffic);
       // botões de ação que só fazem sentido no planejamento
       document.getElementById("generateBtn").style.display = isPlan ? "" : "none";
+      document.getElementById("addTaskBtn").style.display = isPlan ? "" : "none";
       document.getElementById("clickupSyncBtn").style.display = isPlan && cloudIsOwner ? "" : "none";
       document.getElementById("layoutTabs").style.display = isProduction ? "none" : "";
       document.querySelectorAll("#viewTabs .vt").forEach((b) =>
@@ -2845,6 +3021,14 @@
        EVENTOS
        ============================================================ */
     function bind() {
+      document.getElementById("addTaskBtn").onclick = () => openTaskModal();
+      document.getElementById("closeTask").onclick = closeTaskModal;
+      document.getElementById("cancelTask").onclick = closeTaskModal;
+      document.getElementById("saveTask").onclick = saveManualTask;
+      document.getElementById("deleteTask").onclick = deleteManualTask;
+      document.getElementById("taskArea").onchange = () => fillTaskPeople();
+      document.getElementById("taskTitle").onkeydown = (e) => { if (e.key === "Enter") saveManualTask(); };
+      document.getElementById("taskModal").addEventListener("click", (e) => { if (e.target.id === "taskModal") closeTaskModal(); });
       document.getElementById("refreshHealth").onclick = () => loadProductionHealth(true);
       document.getElementById("lockWeek").onclick = () => {
         const week = ensureWeek(STATE, STATE.current);
