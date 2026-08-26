@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
   <meta name="googlebot" content="noindex, nofollow" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-sApo8i6Yb21CfAFrKGOQuJCFnG/WvRBW1tWqjr8qwjhp38VGnYKIZxppMjLXxLtj' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha384-ZGt2dLLVPAKZRIodzUw2z+M3mCsp5LeaxbmS56pC4eydE6lxYQja9NCsdAZxuA7R' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vdotdblluwfogjmdjlob.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>TASK DIÁRIAS · Planejamento Semanal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23161923'/%3E%3Crect%20x='6'%20y='6'%20width='20'%20height='20'%20rx='3'%20fill='none'%20stroke='%236c8cff'%20stroke-width='2.5'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='10'%20rx='2'%20fill='%236c8cff'/%3E%3C/svg%3E" />
@@ -2634,7 +2634,7 @@
       if (kind === "edit") {
         const auSig = (author && author.sigla) || (a.by ? a.by.slice(0, 2).toUpperCase() : "");
         label = `${auSig}-${a.offer}${a.slot === 2 ? "2" : ""}`;
-        el.title = `${a.id || ""}${a.id ? " · " : ""}Copy: ${a.by} · Editor: ${person}`;
+        el.title = `${a.id || ""}${a.id ? " · " : ""}Copy: ${a.by} · Editor: ${person} · duplo clique para adiar`;
       } else if (a.id) {
         el.title += ` · ${a.id} · duplo clique para trocar a oferta`;
       }
@@ -2651,8 +2651,50 @@
           e.stopPropagation();
           openCardOfferPrompt(a.uid);
         });
+      } else {
+        el.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          postponeEditCard(a.uid, person, colKey);
+        });
       }
       return el;
+    }
+
+    function normalizeEditSlots(arr) {
+      if (!arr) return;
+      if (arr.length <= 1) {
+        if (arr[0]) arr[0].slot = null;
+        return;
+      }
+      arr.forEach((card, index) => (card.slot = index === 0 ? 1 : 2));
+    }
+
+    function postponeEditCard(cardUid, person, colKey) {
+      const week = ensureWeek(STATE, STATE.current);
+      const arr = week.edit?.[person]?.[colKey] || [];
+      const index = arr.findIndex((card) => card.uid === cardUid);
+      if (index < 0) return;
+      const card = arr[index];
+      if (!window.confirm(`Adiar ${card.offer} de ${card.by}?\nA leva sairá da edição e ficará como gordura para a próxima semana.`)) return;
+      arr.splice(index, 1);
+      normalizeEditSlots(arr);
+      let original = null;
+      Object.values(week.copy || {}).forEach((row) =>
+        Object.values(row || {}).forEach((item) => {
+          if (item && item.uid === cardUid) original = item;
+        })
+      );
+      if (original) {
+        original.gordura = true;
+        const carry = week.carryOut || (week.carryOut = []);
+        const carryIndex = carry.findIndex((item) => item.uid === cardUid);
+        if (carryIndex >= 0) carry[carryIndex] = { ...original };
+        else carry.push({ ...original });
+      }
+      save();
+      render();
+      toast(`${card.offer} adiado — não conta para o tráfego desta semana.`, "warn");
     }
 
     function openCardOfferPrompt(cardUid) {
@@ -2757,6 +2799,8 @@
         if (!week.edit[to.person]) week.edit[to.person] = {};
         if (!week.edit[to.person][to.colKey]) week.edit[to.person][to.colKey] = [];
         week.edit[to.person][to.colKey].push(card);
+        normalizeEditSlots(arr);
+        normalizeEditSlots(week.edit[to.person][to.colKey]);
       }
       save();
       render();
